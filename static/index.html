@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Kindle Desktop Monitor</title>
+  <style>
+    /* ========================================================
+       E-ink Minimalist 3x3 Dashboard (Legacy WebKit Strict)
+       ======================================================== */
+    * {
+      -webkit-box-sizing: border-box;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    ::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+
+    html {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      touch-action: none;
+    }
+
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 104% !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      touch-action: none;
+      background-color: #ffffff;
+      color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    }
+
+    /* Outer Viewport Stage to completely prevent WebKit scroll overflow */
+    #viewport-stage {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      overflow: hidden !important;
+      background-color: #ffffff;
+    }
+
+    /* Rotator Wrapper */
+    #screen-rotator {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      overflow: hidden !important;
+      background-color: #ffffff;
+      box-sizing: border-box;
+    }
+
+    /* Robust Table Layout for Legacy WebKit: 3 Columns x 3 Rows */
+    #tiles-table {
+      width: 100%;
+      height: 100%;
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 5px;
+      padding: 2px;
+      box-sizing: border-box;
+    }
+
+    .tile-cell {
+      width: 33.333%;
+      height: 33.333%;
+      padding: 0;
+      margin: 0;
+      vertical-align: top;
+    }
+
+    /* Graphical Tile Box */
+    .tile-box {
+      width: 100%;
+      height: 100%;
+      border: 3px solid #000000;
+      background-color: #ffffff;
+      padding: 4px 7px;
+      box-sizing: border-box;
+      display: -webkit-box;
+      display: flex;
+      -webkit-box-orient: vertical;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+      -webkit-box-pack: justify;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    .tile-top {
+      display: -webkit-box;
+      display: flex;
+      -webkit-box-pack: justify;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      align-items: center;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 2px;
+    }
+
+    .tile-title {
+      font-size: 0.95rem;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+    }
+
+    .tile-sub {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #333333;
+    }
+
+    /* Center Number */
+    .tile-mid {
+      display: -webkit-box;
+      display: flex;
+      -webkit-box-align: baseline;
+      align-items: baseline;
+      margin: 1px 0;
+    }
+
+    .tile-num {
+      font-size: 2.2rem;
+      font-weight: 900;
+      line-height: 1;
+      font-family: "Courier New", Courier, monospace, sans-serif;
+    }
+
+    .tile-pct {
+      font-size: 1.15rem;
+      font-weight: 900;
+      margin-left: 2px;
+    }
+
+    /* Graphical Segmented Gauge (10 blocks) */
+    .seg-gauge {
+      width: 100%;
+      height: 10px;
+      display: -webkit-box;
+      display: flex;
+      gap: 2px;
+      margin: 1px 0;
+    }
+
+    .seg {
+      -webkit-box-flex: 1;
+      flex: 1;
+      height: 100%;
+      border: 1px solid #000000;
+      background-color: #ffffff;
+      box-sizing: border-box;
+    }
+
+    .seg.on {
+      background-color: #000000;
+    }
+
+    /* Action Tile for Rotation */
+    .tile-action {
+      cursor: pointer;
+      text-align: center;
+      -webkit-box-align: center;
+      align-items: center;
+      -webkit-box-pack: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .tile-action:active {
+      background-color: #000000;
+      color: #ffffff;
+    }
+
+    .tile-action-icon {
+      font-size: 2.1rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .tile-action-text {
+      font-size: 1rem;
+      font-weight: 900;
+    }
+
+    /* Width Adjuster Buttons */
+    .adj-btn {
+      background: #ffffff;
+      color: #000000;
+      border: 2px solid #000000;
+      font-weight: 900;
+      font-size: 0.8rem;
+      padding: 3px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .adj-btn:active {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    /* ========================================================
+       PC Sleep Overlay
+       ======================================================== */
+    #sleep-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #ffffff;
+      color: #000000;
+      z-index: 9999;
+      padding: 16px;
+      box-sizing: border-box;
+      -webkit-box-orient: vertical;
+      flex-direction: column;
+      -webkit-box-align: center;
+      align-items: center;
+      -webkit-box-pack: center;
+      justify-content: center;
+      text-align: center;
+      gap: 10px;
+    }
+
+    .sleep-icon {
+      font-size: 3.2rem;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .sleep-box {
+      border: 4px solid #000000;
+      padding: 14px 18px;
+      max-width: 400px;
+      width: 88%;
+      background-color: #ffffff;
+      display: -webkit-box;
+      display: flex;
+      -webkit-box-orient: vertical;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sleep-title {
+      font-size: 1.7rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    .sleep-sub {
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .sleep-details {
+      border-top: 2px dashed #000000;
+      border-bottom: 2px dashed #000000;
+      padding: 5px 0;
+      font-size: 0.82rem;
+      text-align: left;
+    }
+
+    .sleep-counter {
+      font-family: monospace;
+      font-size: 0.82rem;
+      font-weight: bold;
+    }
+
+    .flash-invert {
+      -webkit-filter: invert(100%);
+      filter: invert(100%);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Viewport Stage Container to isolate scroll footprint -->
+  <div id="viewport-stage">
+    <!-- Screen Rotator Container -->
+    <div id="screen-rotator">
+
+      <!-- PC Sleep Fullscreen Overlay -->
+      <div id="sleep-overlay">
+        <div class="sleep-box">
+          <div class="sleep-icon">☾ Z z z</div>
+          <div class="sleep-title">PC スリープ中</div>
+          <div class="sleep-sub">ホストPCとの通信が途絶えました</div>
+          <div class="sleep-details">
+            <div>最終通信: <strong id="sleep-last-seen">--:--:--</strong></div>
+            <div>スリープ経過: <strong id="sleep-elapsed">0秒</strong></div>
+            <div>端末時刻: <strong id="sleep-local-clock">--:--:--</strong></div>
+          </div>
+          <div class="sleep-counter" id="sleep-status-text">
+            再接続待機中... (試行 #<span id="sleep-retry-count">0</span>)
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-Column x 3-Row Robust Table -->
+      <table id="tiles-table" cellpadding="0" cellspacing="5">
+        <!-- Row 1 -->
+        <tr>
+          <td class="tile-cell" id="cell-0">
+            <div class="tile-box" id="tile-cpu">
+              <div class="tile-top">
+                <span class="tile-title">CPU</span>
+                <span class="tile-sub" id="val-cpu-cores">--C</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-cpu-num">0</span><span class="tile-pct">%</span>
+              </div>
+              <div class="seg-gauge" id="gauge-cpu">
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </td>
+
+          <td class="tile-cell" id="cell-1">
+            <div class="tile-box" id="tile-mem">
+              <div class="tile-top">
+                <span class="tile-title">RAM</span>
+                <span class="tile-sub"><span id="val-mem-used">0</span>/<span id="val-mem-total">0</span>G</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-mem-num">0</span><span class="tile-pct">%</span>
+              </div>
+              <div class="seg-gauge" id="gauge-mem">
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </td>
+
+          <td class="tile-cell" id="cell-2">
+            <div class="tile-box" id="tile-disk-c">
+              <div class="tile-top">
+                <span class="tile-title">C: (OS)</span>
+                <span class="tile-sub" id="val-disk-c-free">--G 空き</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-disk-c-num">0</span><span class="tile-pct">%</span>
+              </div>
+              <div class="seg-gauge" id="gauge-disk-c">
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Row 2 -->
+        <tr>
+          <td class="tile-cell" id="cell-3">
+            <div class="tile-box" id="tile-disk-d">
+              <div class="tile-top">
+                <span class="tile-title">D: (SSD)</span>
+                <span class="tile-sub" id="val-disk-d-free">--G 空き</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-disk-d-num">0</span><span class="tile-pct">%</span>
+              </div>
+              <div class="seg-gauge" id="gauge-disk-d">
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </td>
+
+          <td class="tile-cell" id="cell-4">
+            <div class="tile-box" id="tile-disk-e">
+              <div class="tile-top">
+                <span class="tile-title">E: (SSD)</span>
+                <span class="tile-sub" id="val-disk-e-free">--G 空き</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-disk-e-num">0</span><span class="tile-pct">%</span>
+              </div>
+              <div class="seg-gauge" id="gauge-disk-e">
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </td>
+
+          <td class="tile-cell" id="cell-5">
+            <div class="tile-box" id="tile-disk-f">
+              <div class="tile-top">
+                <span class="tile-title">F: (SSD)</span>
+                <span class="tile-sub" id="val-disk-f-free">--G 空き</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-disk-f-num">0</span><span class="tile-pct">%</span>
+              </div>
+              <div class="seg-gauge" id="gauge-disk-f">
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Row 3 -->
+        <tr>
+          <td class="tile-cell" id="cell-6">
+            <div class="tile-box" id="tile-system">
+              <div class="tile-top">
+                <span class="tile-title">UPTIME</span>
+                <span class="tile-sub">稼働</span>
+              </div>
+              <div class="tile-mid">
+                <span class="tile-num" id="val-uptime-num">--</span>
+              </div>
+              <div class="seg-gauge" id="gauge-uptime">
+                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
+                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
+              </div>
+            </div>
+          </td>
+
+          <td class="tile-cell" id="cell-7">
+            <!-- Interactive Tile: Width Tuning & Real-time Diagnostics -->
+            <div class="tile-box" id="tile-host">
+              <div class="tile-top">
+                <span class="tile-title">STATUS</span>
+                <span class="tile-sub" id="diag-dims">--</span>
+              </div>
+              <div class="tile-mid" style="justify-content: space-between; width: 100%;">
+                <button class="adj-btn" onclick="adjustOffset(10); event.stopPropagation();">◀ 短縮</button>
+                <span class="tile-num" style="font-size: 1.15rem;" id="val-cur-w">--</span>
+                <button class="adj-btn" onclick="adjustOffset(-10); event.stopPropagation();">伸長 ▶</button>
+              </div>
+              <div class="tile-top" style="border-top: 1px dashed #000; border-bottom: none; padding-top: 2px;">
+                <span class="tile-sub" id="diag-scroll-stats">T:0 L:0</span>
+                <span class="tile-sub" id="diag-scr-h">Scr:--</span>
+              </div>
+            </div>
+          </td>
+
+          <td class="tile-cell" id="cell-8">
+            <div class="tile-box tile-action" id="tile-rotate" onclick="cycleRotation()">
+              <div class="tile-action-icon">⟳</div>
+              <div class="tile-action-text" id="val-rot-label">90°</div>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+    </div>
+  </div>
+
+  <script>
+    var consecutiveFailures = 0;
+    var failureThreshold = 2;
+    var isSleeping = false;
+    var lastSuccessTime = null;
+    var sleepStartTime = null;
+    var retryCount = 0;
+    var pollIntervalMs = 8000;
+    var currentRotation = '90';
+
+    // Width offset deduction from height: default 42 gives 1268 - 42 = 1226px
+    var customWidthOffset = 42;
+    try {
+      var savedOffset = localStorage.getItem('kindle_width_offset');
+      if (savedOffset !== null) {
+        var parsed = parseInt(savedOffset, 10);
+        if (!isNaN(parsed) && parsed < 100) {
+          customWidthOffset = parsed;
+        }
+      }
+    } catch(e) {}
+
+    // Auto-Reload mechanism: server instance ID
+    var serverInstanceId = null;
+
+    // Shuffle Burn-in prevention
+    var pollCycleCount = 0;
+    var shuffleIntervalCycles = 75; // 75 cycles * 8s = 10 minutes
+
+    function padZero(num) {
+      return (num < 10 ? '0' : '') + num;
+    }
+
+    function formatTime(d) {
+      return padZero(d.getHours()) + ':' + padZero(d.getMinutes()) + ':' + padZero(d.getSeconds());
+    }
+
+    function formatElapsed(seconds) {
+      if (seconds < 60) return Math.floor(seconds) + '秒';
+      var minutes = Math.floor(seconds / 60);
+      var remSec = Math.floor(seconds % 60);
+      if (minutes < 60) return minutes + '分 ' + remSec + '秒';
+      var hours = Math.floor(minutes / 60);
+      var remMin = minutes % 60;
+      return hours + '時間 ' + remMin + '分';
+    }
+
+    function setGauge(gaugeId, percent) {
+      var gauge = document.getElementById(gaugeId);
+      if (!gauge) return;
+      var activeCount = Math.round((percent / 100) * 10);
+      if (activeCount < 0) activeCount = 0;
+      if (activeCount > 10) activeCount = 10;
+      var segs = gauge.getElementsByClassName('seg');
+      for (var i = 0; i < segs.length; i++) {
+        if (i < activeCount) {
+          segs[i].className = 'seg on';
+        } else {
+          segs[i].className = 'seg';
+        }
+      }
+    }
+
+    function findDisk(disks, letter) {
+      if (!disks) return null;
+      for (var i = 0; i < disks.length; i++) {
+        var name = (disks[i].name || '').toUpperCase();
+        if (name.indexOf(letter + ':') === 0) {
+          return disks[i];
+        }
+      }
+      return null;
+    }
+
+    function updateDiskTile(disk, numId, freeId, gaugeId) {
+      if (!disk) return;
+      var pct = Math.round(disk.usage_percent || 0);
+      var numEl = document.getElementById(numId);
+      var freeEl = document.getElementById(freeId);
+      if (numEl) numEl.innerText = pct;
+      if (freeEl) freeEl.innerText = Math.round(disk.free_gb) + 'G 空き';
+      setGauge(gaugeId, pct);
+    }
+
+    function renderStatus(data) {
+      // 1. CPU
+      var cpuPct = Math.round(data.cpu_usage || 0);
+      document.getElementById('val-cpu-num').innerText = cpuPct;
+      document.getElementById('val-cpu-cores').innerText = (data.cpu_cores || 0) + 'C';
+      setGauge('gauge-cpu', cpuPct);
+
+      // 2. RAM
+      var memPct = Math.round(data.mem_percent || 0);
+      document.getElementById('val-mem-num').innerText = memPct;
+      document.getElementById('val-mem-used').innerText = Math.round(data.mem_used_gb || 0);
+      document.getElementById('val-mem-total').innerText = Math.round(data.mem_total_gb || 0);
+      setGauge('gauge-mem', memPct);
+
+      // 3. Disks: C, D, E, F
+      if (data.disks && data.disks.length > 0) {
+        updateDiskTile(findDisk(data.disks, 'C'), 'val-disk-c-num', 'val-disk-c-free', 'gauge-disk-c');
+        updateDiskTile(findDisk(data.disks, 'D'), 'val-disk-d-num', 'val-disk-d-free', 'gauge-disk-d');
+        updateDiskTile(findDisk(data.disks, 'E'), 'val-disk-e-num', 'val-disk-e-free', 'gauge-disk-e');
+        updateDiskTile(findDisk(data.disks, 'F'), 'val-disk-f-num', 'val-disk-f-free', 'gauge-disk-f');
+      }
+
+      // 4. System & Host
+      document.getElementById('val-uptime-num').innerText = data.uptime_days ? (data.uptime_days + '日') : (data.uptime_str || '--');
+    }
+
+    function enterSleepMode() {
+      if (isSleeping) return;
+      isSleeping = true;
+      sleepStartTime = new Date();
+
+      var sleepOverlay = document.getElementById('sleep-overlay');
+      sleepOverlay.style.display = '-webkit-box';
+      sleepOverlay.style.display = 'flex';
+
+      if (lastSuccessTime) {
+        document.getElementById('sleep-last-seen').innerText = formatTime(lastSuccessTime);
+      } else {
+        document.getElementById('sleep-last-seen').innerText = '未接続';
+      }
+
+      updateSleepStatus();
+    }
+
+    function exitSleepMode() {
+      if (!isSleeping) return;
+      isSleeping = false;
+      sleepStartTime = null;
+      retryCount = 0;
+
+      var sleepOverlay = document.getElementById('sleep-overlay');
+      sleepOverlay.style.display = 'none';
+
+      clearGhosting();
+    }
+
+    function updateSleepStatus() {
+      if (!isSleeping) return;
+      var now = new Date();
+      document.getElementById('sleep-local-clock').innerText = formatTime(now);
+      if (sleepStartTime) {
+        var elapsedSec = (now.getTime() - sleepStartTime.getTime()) / 1000;
+        document.getElementById('sleep-elapsed').innerText = formatElapsed(elapsedSec);
+      }
+      document.getElementById('sleep-retry-count').innerText = retryCount;
+    }
+
+    function pollStatus() {
+      if (isSleeping) {
+        retryCount++;
+        updateSleepStatus();
+      }
+
+      var winW = window.innerWidth || 0;
+      var winH = window.innerHeight || 0;
+      var docW = document.documentElement ? document.documentElement.clientWidth : 0;
+      var docH = document.documentElement ? document.documentElement.clientHeight : 0;
+      var scrW = document.documentElement ? document.documentElement.scrollWidth : 0;
+      var scrH = document.documentElement ? document.documentElement.scrollHeight : 0;
+      var sTop = window.pageYOffset || (document.documentElement ? document.documentElement.scrollTop : 0) || (document.body ? document.body.scrollTop : 0) || 0;
+      var sLeft = window.pageXOffset || (document.documentElement ? document.documentElement.scrollLeft : 0) || (document.body ? document.body.scrollLeft : 0) || 0;
+
+      var telemetry = '&winW=' + winW + '&winH=' + winH
+        + '&docW=' + docW + '&docH=' + docH
+        + '&scrW=' + scrW + '&scrH=' + scrH
+        + '&sTop=' + sTop + '&sLeft=' + sLeft
+        + '&rot=' + currentRotation;
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/status?nocache=' + new Date().getTime() + telemetry, true);
+      xhr.timeout = 5000;
+
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+
+            if (data.server_instance) {
+              if (serverInstanceId === null) {
+                serverInstanceId = data.server_instance;
+              } else if (serverInstanceId !== data.server_instance) {
+                window.location.href = window.location.pathname + '?r=' + new Date().getTime();
+                return;
+              }
+            }
+
+            consecutiveFailures = 0;
+            lastSuccessTime = new Date();
+
+            if (isSleeping) {
+              exitSleepMode();
+            }
+
+            renderStatus(data);
+
+            pollCycleCount++;
+            if (pollCycleCount >= shuffleIntervalCycles) {
+              pollCycleCount = 0;
+              shuffleTiles();
+            }
+
+          } catch (e) {
+            handleFailure();
+          }
+        } else {
+          handleFailure();
+        }
+      };
+
+      xhr.onerror = function() { handleFailure(); };
+      xhr.ontimeout = function() { handleFailure(); };
+
+      xhr.send();
+    }
+
+    function handleFailure() {
+      consecutiveFailures++;
+      if (consecutiveFailures >= failureThreshold) {
+        enterSleepMode();
+      }
+    }
+
+    function shuffleTiles() {
+      var cells = [];
+      for (var i = 0; i < 9; i++) {
+        var cell = document.getElementById('cell-' + i);
+        if (cell && cell.firstElementChild) {
+          cells.push(cell.firstElementChild);
+        }
+      }
+
+      for (var j = cells.length - 1; j > 0; j--) {
+        var k = Math.floor(Math.random() * (j + 1));
+        var temp = cells[j];
+        cells[j] = cells[k];
+        cells[k] = temp;
+      }
+
+      for (var m = 0; m < 9; m++) {
+        var targetCell = document.getElementById('cell-' + m);
+        if (targetCell && cells[m]) {
+          targetCell.appendChild(cells[m]);
+        }
+      }
+
+      clearGhosting();
+    }
+
+    /* Adjust offset (+10px shortens height, -10px lengthens) */
+    function adjustOffset(delta) {
+      customWidthOffset += delta;
+      if (customWidthOffset < 0) customWidthOffset = 0;
+      try {
+        localStorage.setItem('kindle_width_offset', customWidthOffset);
+      } catch(e) {}
+      applyRotation();
+      clearGhosting();
+    }
+
+    function getViewportDimensions() {
+      var w = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 0) || 1072;
+      var h = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 1260;
+      // If h is reported as raw screen height (>=1400px), deduct Kindle browser chrome (~188px)
+      if (h >= 1400) {
+        h = 1260;
+      }
+      return { w: w, h: h };
+    }
+
+    /* Apply rotation with exact pixel clamp on root elements */
+    function applyRotation() {
+      var rotator = document.getElementById('screen-rotator');
+      var stage = document.getElementById('viewport-stage');
+      if (!rotator || !stage) return;
+
+      var dims = getViewportDimensions();
+      var w = dims.w;
+      var h = dims.h;
+
+      // Lock documentElement strictly to real viewport
+      document.documentElement.style.width = w + 'px';
+      document.documentElement.style.height = h + 'px';
+
+      // Push body width by +40px to cast the native right-edge scrollbar off the screen
+      document.body.style.width = (w + 40) + 'px';
+      document.body.style.height = h + 'px';
+
+      // Stage remains locked to the exact visible viewport (w x h)
+      stage.style.width = w + 'px';
+      stage.style.height = h + 'px';
+
+      var safeLandscapeW = Math.max(100, h - customWidthOffset);
+      var safeLandscapeH = Math.max(100, w - 8);
+
+      var curWEl = document.getElementById('val-cur-w');
+      if (curWEl) curWEl.innerText = safeLandscapeW + 'px';
+
+      var diagEl = document.getElementById('diag-dims');
+      if (diagEl) diagEl.innerText = 'H:' + h + ' W:' + w;
+
+      rotator.style.position = 'absolute';
+      rotator.style.left = '0px';
+      rotator.style.top = '0px';
+      rotator.style.width = safeLandscapeW + 'px';
+      rotator.style.height = safeLandscapeH + 'px';
+      rotator.style.webkitTransformOrigin = '0 0';
+      rotator.style.transformOrigin = '0 0';
+
+      if (currentRotation === '90') {
+        var transformStr = 'translate(' + safeLandscapeH + 'px, 0px) rotate(90deg)';
+        rotator.style.webkitTransform = transformStr;
+        rotator.style.transform = transformStr;
+        document.getElementById('val-rot-label').innerText = '90°';
+      } else if (currentRotation === '270') {
+        var transformStr = 'translate(0px, ' + safeLandscapeW + 'px) rotate(-90deg)';
+        rotator.style.webkitTransform = transformStr;
+        rotator.style.transform = transformStr;
+        document.getElementById('val-rot-label').innerText = '270°';
+      } else {
+        // '0' (Portrait)
+        rotator.style.width = (w - 8) + 'px';
+        rotator.style.height = (h - 8) + 'px';
+        rotator.style.left = '4px';
+        rotator.style.top = '4px';
+        rotator.style.webkitTransform = 'none';
+        rotator.style.transform = 'none';
+        document.getElementById('val-rot-label').innerText = '0°';
+      }
+
+      window.scrollTo(0, 0);
+      updateScrollStats();
+    }
+
+    function updateScrollStats() {
+      var top = window.pageYOffset || (document.documentElement ? document.documentElement.scrollTop : 0) || (document.body ? document.body.scrollTop : 0) || 0;
+      var left = window.pageXOffset || (document.documentElement ? document.documentElement.scrollLeft : 0) || (document.body ? document.body.scrollLeft : 0) || 0;
+      var scrH = document.documentElement ? document.documentElement.scrollHeight : 0;
+      var el = document.getElementById('diag-scroll-stats');
+      if (el) el.innerText = 'T:' + top + ' L:' + left;
+      var scrEl = document.getElementById('diag-scr-h');
+      if (scrEl) scrEl.innerText = 'Scr:' + scrH;
+    }
+
+    try {
+      document.addEventListener('touchmove', function(e) {
+        if (e.preventDefault) e.preventDefault();
+      }, false);
+    } catch (e) {}
+
+    function setRotation(rot) {
+      currentRotation = rot;
+      applyRotation();
+      try {
+        localStorage.setItem('kindle_monitor_rot', rot);
+      } catch (e) {}
+      clearGhosting();
+    }
+
+    function cycleRotation() {
+      if (currentRotation === '90') {
+        setRotation('270');
+      } else if (currentRotation === '270') {
+        setRotation('0');
+      } else {
+        setRotation('90');
+      }
+    }
+
+    window.addEventListener('resize', applyRotation);
+    window.addEventListener('scroll', updateScrollStats, false);
+
+    function clearGhosting() {
+      document.body.className = 'flash-invert';
+      setTimeout(function() {
+        document.body.className = '';
+      }, 150);
+    }
+
+    try {
+      var savedRot = localStorage.getItem('kindle_monitor_rot');
+      if (savedRot) {
+        currentRotation = savedRot;
+      }
+    } catch (e) {}
+
+    applyRotation();
+    pollStatus();
+    setInterval(pollStatus, pollIntervalMs);
+
+    setInterval(function() {
+      if (isSleeping) updateSleepStatus();
+    }, 1000);
+  </script>
+</body>
+</html>
