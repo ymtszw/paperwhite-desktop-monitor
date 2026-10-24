@@ -305,12 +305,15 @@ mod win_fans {
                     for s in sensors {
                         let rpm = s.value.round() as u32;
                         let lower = s.name.to_lowercase();
-                        if lower.contains("cpu") && cpu_fan.is_none() {
-                            cpu_fan = Some(rpm);
+                        if lower.contains("cpu") {
+                            if cpu_fan.is_none() || (cpu_fan == Some(0) && rpm > 0) {
+                                cpu_fan = Some(rpm);
+                            }
                         } else if !lower.contains("gpu") {
                             case_fans.push(FanInfo { name: s.name, rpm });
                         }
                     }
+                    case_fans.sort_by_key(|f| f.name.to_uppercase());
                     return (cpu_fan, case_fans);
                 }
             }
