@@ -237,17 +237,52 @@
       border-color: #000000;
     }
 
+    .system-info-box {
+      margin: 10px 0;
+      width: 100%;
+    }
+
+    .system-info-row {
+      display: table;
+      width: 100%;
+      border-bottom: 2px solid #000000;
+      padding: 10px 0;
+      box-sizing: border-box;
+    }
+
+    .system-info-row:last-child {
+      border-bottom: none;
+    }
+
+    .system-info-label {
+      display: table-cell;
+      font-size: 1.25rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .system-info-val {
+      display: table-cell;
+      font-size: 1.55rem;
+      font-weight: 900;
+      text-align: right;
+      vertical-align: middle;
+      font-family: monospace, sans-serif;
+    }
+
     .system-action-box {
       width: 100%;
-      height: 76px;
+      height: 52px;
       border: 3px solid #000000;
       background-color: #000000;
       color: #ffffff;
       display: -webkit-box;
       display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-flex-direction: column;
-      flex-direction: column;
+      -webkit-box-orient: horizontal;
+      -webkit-flex-direction: row;
+      flex-direction: row;
       -webkit-box-align: center;
       align-items: center;
       -webkit-box-pack: center;
@@ -255,20 +290,20 @@
       box-sizing: border-box;
       flex-shrink: 0;
       margin-top: auto;
-      border-radius: 2px;
+      border-radius: 4px;
     }
 
     .system-action-icon {
-      font-size: 2.2rem;
+      font-size: 1.8rem;
       line-height: 1;
       font-weight: 900;
+      margin-right: 8px;
     }
 
     .system-action-btn-text {
-      font-size: 1.05rem;
+      font-size: 1.2rem;
       font-weight: 900;
-      letter-spacing: 1px;
-      margin-top: 2px;
+      letter-spacing: 1.5px;
     }
 
     /* ========================================================
@@ -476,18 +511,19 @@
               <div class="tile-top">
                 <div class="tile-title">SYSTEM</div>
               </div>
-              <div class="tile-mid">
-                <div class="tile-num-wrap">
-                  <span class="tile-num" id="val-rot-deg" style="font-size: 3.2rem; font-family: inherit;">90</span><span class="tile-pct" style="font-size: 1.8rem;">°</span>
+              <div class="system-info-box">
+                <div class="system-info-row">
+                  <span class="system-info-label">SYS TEMP</span>
+                  <span class="system-info-val" id="val-sys-temp">28°C</span>
                 </div>
-                <div class="tile-sub-stat">
-                  <div>SCREEN</div>
-                  <div id="val-rot-orient">横向き</div>
+                <div class="system-info-row">
+                  <span class="system-info-label">ROTATION</span>
+                  <span class="system-info-val" id="val-sys-rot">横 90°</span>
                 </div>
               </div>
               <div class="system-action-box">
-                <div class="system-action-icon">⟳</div>
-                <div class="system-action-btn-text">タップで回転</div>
+                <span class="system-action-icon">⟳</span>
+                <span class="system-action-btn-text">タップで回転</span>
               </div>
             </div>
           </td>
@@ -659,6 +695,17 @@
             + '</div>';
         }
         document.getElementById('disks-container').innerHTML = dHtml;
+      }
+
+      // 6. System Temp
+      var sysTempElem = document.getElementById('val-sys-temp');
+      if (sysTempElem) {
+        var sTemp = data.sys_temp || data.cpu_temp;
+        if (sTemp) {
+          sysTempElem.innerText = sTemp + '°C';
+        } else {
+          sysTempElem.innerText = '--°C';
+        }
       }
     }
 
@@ -838,21 +885,18 @@
       rotator.style.webkitTransformOrigin = '0 0';
       rotator.style.transformOrigin = '0 0';
 
-      var degElem = document.getElementById('val-rot-deg');
-      var orientElem = document.getElementById('val-rot-orient');
+      var rotElem = document.getElementById('val-sys-rot');
 
       if (currentRotation === '90') {
         var transformStr = 'translate(' + safeLandscapeH + 'px, 0px) rotate(90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
-        if (degElem) degElem.innerText = '90';
-        if (orientElem) orientElem.innerText = '横向き';
+        if (rotElem) rotElem.innerText = '横 90°';
       } else if (currentRotation === '270') {
         var transformStr = 'translate(0px, ' + safeLandscapeW + 'px) rotate(-90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
-        if (degElem) degElem.innerText = '270';
-        if (orientElem) orientElem.innerText = '横向き';
+        if (rotElem) rotElem.innerText = '横 270°';
       } else {
         // '0' (Portrait)
         rotator.style.width = (w - 8) + 'px';
@@ -861,8 +905,7 @@
         rotator.style.top = '4px';
         rotator.style.webkitTransform = 'none';
         rotator.style.transform = 'none';
-        if (degElem) degElem.innerText = '0';
-        if (orientElem) orientElem.innerText = '縦向き';
+        if (rotElem) rotElem.innerText = '縦 0°';
       }
 
       window.scrollTo(0, 0);

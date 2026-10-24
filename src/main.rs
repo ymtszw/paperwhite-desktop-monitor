@@ -282,6 +282,7 @@ pub struct SystemStatus {
     pub os: String,
     pub server_ip: String,
     pub server_port: u16,
+    pub sys_temp: Option<u32>,
 
     // CPU
     pub cpu_usage: f32, // smoothed %
@@ -618,6 +619,7 @@ async fn main() {
                 lock.os = os_str.clone();
                 lock.server_ip = local_ip_clone.clone();
                 lock.server_port = port;
+                lock.sys_temp = cpu_temp;
 
                 lock.cpu_usage = cpu_avg;
                 lock.cpu_cores = cpu_cores;
