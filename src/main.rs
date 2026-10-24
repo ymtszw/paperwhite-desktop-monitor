@@ -8,7 +8,7 @@ use axum::{
     routing::get,
     Router,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     fs::OpenOptions,
@@ -275,6 +275,38 @@ pub struct DiskInfo {
     pub usage_percent: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NasStats {
+    #[serde(rename = "cpuPct")]
+    pub cpu_pct: f64,
+    #[serde(rename = "systemLoad1")]
+    pub system_load1: f64,
+    #[serde(rename = "memTotalGb")]
+    pub mem_total_gb: f64,
+    #[serde(rename = "memUsedGb")]
+    pub mem_used_gb: f64,
+    #[serde(rename = "memPct")]
+    pub mem_pct: f64,
+    #[serde(rename = "diskTotalGb")]
+    pub disk_total_gb: f64,
+    #[serde(rename = "diskUsedGb")]
+    pub disk_used_gb: f64,
+    #[serde(rename = "diskFreeGb")]
+    pub disk_free_gb: f64,
+    #[serde(rename = "diskPct")]
+    pub disk_pct: f64,
+    #[serde(rename = "netInKb")]
+    pub net_in_kb: f64,
+    #[serde(rename = "netOutKb")]
+    pub net_out_kb: f64,
+    #[serde(rename = "tempC")]
+    pub temp_c: f64,
+    #[serde(default)]
+    pub online: bool,
+    #[serde(default)]
+    pub cpu_history: Vec<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct SystemStatus {
     pub server_instance: u64, // Unique timestamp for auto-reload detection
@@ -283,6 +315,9 @@ pub struct SystemStatus {
     pub server_ip: String,
     pub server_port: u16,
     pub sys_temp: Option<u32>,
+
+    // Synology NAS (DS223j)
+    pub nas: Option<NasStats>,
 
     // CPU
     pub cpu_usage: f32, // smoothed %
@@ -484,6 +519,13 @@ async fn main() {
         let mut gpu_hist: VecDeque<f32> = VecDeque::from(vec![0.0; HIST_LEN]);
         let mut net_in_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
         let mut net_out_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
+        let mut nas_cpu_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
+
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_millis(1500))
+            .build()
+            .unwrap_or_default();
+        let mut last_nas_stats: Option<NasStats> = None;
 
         let mut second_counter: u64 = 0;
 
@@ -564,7 +606,7 @@ async fn main() {
             if net_out_smooth.len() > SMOOTH_WINDOW { net_out_smooth.pop_front(); }
             let net_out_avg = net_out_smooth.iter().sum::<f64>() / net_out_smooth.len() as f64;
 
-            // History sampling every 2 seconds
+            // History & NAS sampling every 2 seconds
             second_counter += 1;
             if second_counter % 2 == 0 {
                 cpu_hist.push_back(cpu_avg);
@@ -581,6 +623,21 @@ async fn main() {
 
                 net_out_hist.push_back(net_out_avg);
                 if net_out_hist.len() > HIST_LEN { net_out_hist.pop_front(); }
+
+                // Query NAS stats
+                let client = http_client.clone();
+                let resp = client.get("http://192.168.0.12:8789/api/stats").send().await;
+                if let Ok(res) = resp {
+                    if let Ok(mut stats) = res.json::<NasStats>().await {
+                        stats.online = true;
+                        nas_cpu_hist.push_back(stats.cpu_pct);
+                        if nas_cpu_hist.len() > HIST_LEN { nas_cpu_hist.pop_front(); }
+                        stats.cpu_history = nas_cpu_hist.iter().copied().collect();
+                        last_nas_stats = Some(stats);
+                    }
+                } else if let Some(ref mut st) = last_nas_stats {
+                    st.online = false;
+                }
             }
 
             // 5. Disks (all non-removable, sorted by name A-Z)
@@ -644,6 +701,7 @@ async fn main() {
                 lock.net_out_history = net_out_hist.iter().copied().collect();
 
                 lock.disks = disk_list;
+                lock.nas = last_nas_stats.clone();
             }
 
             tokio::time::sleep(Duration::from_secs(1)).await;
