@@ -96,13 +96,14 @@ Because the binary uses `#![windows_subsystem = "windows"]`, launching it in sta
 
 - **CPU Temperature**:
   - Read via native Windows PDH performance counter: `\Thermal Zone Information(\_TZ.TZ00)\Temperature` (converted from Kelvin to Celsius). Falls back to `sysinfo::Components`.
-- **GPU Metrics (Usage, VRAM, Temperature, Fan %)**:
-  - Read via native NVML (`nvml-wrapper` crate loading `nvml.dll`). Operates with zero user privilege issues.
-- **Motherboard / Case Fan Sensors**:
-  - The PC's motherboard (MSI PRO Z790-A) uses a Nuvoton NCT6687D Super I/O chip. Direct port I/O access requires a Ring 0 driver.
+- **GPU Metrics (Usage, VRAM, Temperature, Fan RPM / %)**:
+  - Read via native NVML (`nvml-wrapper` crate loading `nvml.dll`). Retrieves live fan speed directly in RPM via `dev.fan_speed_rpm(0)` (falling back to percentage via `dev.fan_speed(0)`). Operates in user mode with zero elevation issues.
+- **Motherboard / Case Fan Sensors (MSI PRO Z790-A)**:
+  - The PC's motherboard uses a Nuvoton NCT6687D Super I/O chip. Direct port I/O access (ports 0x2E/0x2F) requires a Ring 0 kernel driver.
+  - While MSI Center uses `NTIOLib_X64.sys` internally, its driver device (`\\.\NTIOLib_CC_COMM`) and named pipe (`\\.\pipe\MSI_CC_Engine`) enforce strict ACLs (Administrator/SYSTEM only) and do NOT expose a public WMI provider or REST API.
   - The server queries `root\LibreHardwareMonitor` and `root\OpenHardwareMonitor` via WMI (`wmi` crate) using `SELECT Name, Value FROM Sensor WHERE SensorType = 'Fan'`.
-  - When LibreHardwareMonitor/FanControl is running as Administrator with WMI enabled, all fan speeds (`CPU Fan`, `Pump Fan`, `System Fan 1..N`) are dynamically queried.
-  - If WMI is standby, the GPU fan (%) remains fully active, and the fan panel gracefully shows standby states without layout breaking.
+  - When LibreHardwareMonitor or FanControl runs with Administrator privileges and WMI enabled, all fan speeds (`CPU Fan`, `Pump Fan`, `System Fan 1..N`) are dynamically queried.
+  - If WMI is standby, the GPU fan (RPM) remains fully active, and the CPU/SYS fan panels gracefully show standby states without breaking layout.
 - **Synology NAS Telemetry**:
   - Sampled asynchronously every 2 seconds from `http://192.168.0.12:8789/api/stats` (`fnz-nas` daemon on DS223j).
   - Retrieves `cpuPct`, `memPct`, `diskPct` (`/volume1`), `tempC`, `netInKb`, `netOutKb`, and `systemLoad1`.
