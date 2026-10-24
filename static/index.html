@@ -160,17 +160,19 @@
     /* Graphical History Sparkline Chart (20 vertical columns) */
     .hist-container {
       width: 100%;
-      height: 140px;
+      height: 96px;
       border-top: 3px solid #000000;
-      padding-top: 8px;
+      padding-top: 6px;
       box-sizing: border-box;
       display: table;
       table-layout: fixed;
+      flex-shrink: 0;
+      margin-top: auto;
     }
 
     .hist-col {
       display: table-cell;
-      height: 100%;
+      height: 84px;
       vertical-align: bottom;
       padding: 0 2px;
       box-sizing: border-box;
@@ -179,24 +181,26 @@
     .hist-bar {
       width: 100%;
       background-color: #000000;
-      min-height: 3px;
-      height: 3px;
+      min-height: 4px;
+      height: 4px;
+      display: block;
+      box-sizing: border-box;
     }
 
-    /* Multi-Disk Storage Rows */
+    /* Multi-Disk Storage Rows (Compact 4-drive fit) */
     .disk-row {
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .disk-header {
       display: table;
       width: 100%;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
     }
 
     .disk-name {
       display: table-cell;
-      font-size: 1.3rem;
+      font-size: 1.15rem;
       font-weight: 900;
       font-family: monospace;
       text-align: left;
@@ -204,15 +208,15 @@
 
     .disk-meta {
       display: table-cell;
-      font-size: 1.1rem;
+      font-size: 0.95rem;
       font-weight: 800;
       text-align: right;
     }
 
     .disk-track {
       width: 100%;
-      height: 20px;
-      border: 3px solid #000000;
+      height: 12px;
+      border: 2px solid #000000;
       background-color: #ffffff;
       box-sizing: border-box;
     }
@@ -222,46 +226,48 @@
       background-color: #000000;
     }
 
-    /* Action Tile for Rotation & Status */
+    /* System Rotation Action Tile */
     .tile-action {
       cursor: pointer;
-      text-align: center;
+    }
+
+    .tile-action:active .system-action-box {
+      background-color: #ffffff;
+      color: #000000;
+      border-color: #000000;
+    }
+
+    .system-action-box {
+      width: 100%;
+      height: 96px;
+      border: 3px solid #000000;
+      background-color: #000000;
+      color: #ffffff;
+      display: -webkit-box;
+      display: flex;
+      -webkit-box-orient: vertical;
+      -webkit-flex-direction: column;
+      flex-direction: column;
       -webkit-box-align: center;
       align-items: center;
       -webkit-box-pack: center;
       justify-content: center;
+      box-sizing: border-box;
+      flex-shrink: 0;
+      margin-top: auto;
     }
 
-    .tile-action:active {
-      background-color: #000000;
-      color: #ffffff;
-    }
-
-    .tile-action:active .tile-action-icon,
-    .tile-action:active .tile-action-label,
-    .tile-action:active .tile-action-sub,
-    .tile-action:active .adj-btn {
-      color: #ffffff;
-      border-color: #ffffff;
-    }
-
-    .tile-action-icon {
-      font-size: 5rem;
-      font-weight: 900;
+    .system-action-icon {
+      font-size: 2.8rem;
       line-height: 1;
-      margin: 12px 0 6px 0;
+      font-weight: 900;
     }
 
-    .tile-action-label {
-      font-size: 1.7rem;
+    .system-action-btn-text {
+      font-size: 1.15rem;
       font-weight: 900;
       letter-spacing: 1px;
-    }
-
-    .tile-action-sub {
-      font-size: 1.15rem;
-      font-weight: 800;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     /* ========================================================
@@ -375,7 +381,7 @@
                 </div>
                 <div class="tile-sub-stat">
                   <div id="val-cpu-cores">--C</div>
-                  <div id="val-cpu-temp" style="display: none;">--°C</div>
+                  <div id="val-cpu-temp">--°C</div>
                 </div>
               </div>
               <div class="hist-container" id="hist-cpu">
@@ -469,11 +475,18 @@
               <div class="tile-top">
                 <div class="tile-title">SYSTEM</div>
               </div>
-              <div style="text-align: center; margin: auto 0;">
-                <div class="tile-action-icon">⟳</div>
-                <div class="tile-action-label" id="val-rot-label">90° 画面回転</div>
-                <div class="tile-action-sub">タップで回転切替</div>
-                <div class="tile-action-sub" style="margin-top: 8px; font-weight: 900;" id="val-sys-temp"></div>
+              <div class="tile-mid">
+                <div class="tile-num-wrap">
+                  <span class="tile-num" id="val-rot-deg">90</span><span class="tile-pct">°</span>
+                </div>
+                <div class="tile-sub-stat">
+                  <div>ROTATION</div>
+                  <div id="val-rot-orient">LANDSCAPE</div>
+                </div>
+              </div>
+              <div class="system-action-box">
+                <div class="system-action-icon">⟳</div>
+                <div class="system-action-btn-text">画面回転を切替</div>
               </div>
             </div>
           </td>
@@ -498,10 +511,6 @@
 
     // Auto-Reload mechanism: server instance ID
     var serverInstanceId = null;
-
-    // Shuffle Burn-in prevention
-    var pollCycleCount = 0;
-    var shuffleIntervalCycles = 75; // 75 cycles * 8s = 10 minutes
 
     function padZero(num) {
       return (num < 10 ? '0' : '') + num;
@@ -553,13 +562,14 @@
         }
       }
 
+      var maxBarPx = 76;
       var len = bars.length;
       var dataLen = dataArray ? dataArray.length : 0;
       for (var i = 0; i < len; i++) {
         var dataIdx = dataLen - len + i;
         var val = (dataIdx >= 0 && dataIdx < dataLen) ? dataArray[dataIdx] : 0;
-        var pct = Math.min(100, Math.max(3, Math.round((val / max) * 100)));
-        bars[i].style.height = pct + '%';
+        var barPx = Math.min(maxBarPx, Math.max(4, Math.round((val / max) * maxBarPx)));
+        bars[i].style.height = barPx + 'px';
       }
     }
 
@@ -579,10 +589,8 @@
       if (cpuTempElem) {
         if (data.cpu_temp) {
           cpuTempElem.innerText = data.cpu_temp + '°C';
-          cpuTempElem.style.display = 'block';
         } else {
-          cpuTempElem.innerText = '';
-          cpuTempElem.style.display = 'none';
+          cpuTempElem.innerText = '--°C';
         }
       }
       updateHistoryChart('hist-cpu', data.cpu_history, 100);
@@ -650,19 +658,6 @@
             + '</div>';
         }
         document.getElementById('disks-container').innerHTML = dHtml;
-      }
-
-      // 6. System Tile Temps
-      var sysTempElem = document.getElementById('val-sys-temp');
-      if (sysTempElem) {
-        var temps = [];
-        if (data.cpu_temp) temps.push('CPU ' + data.cpu_temp + '°C');
-        if (data.gpu_temp) temps.push('GPU ' + data.gpu_temp + '°C');
-        if (temps.length > 0) {
-          sysTempElem.innerText = temps.join(' | ');
-        } else {
-          sysTempElem.innerText = '';
-        }
       }
     }
 
@@ -773,12 +768,6 @@
 
               renderStatus(data);
 
-              pollCycleCount++;
-              if (pollCycleCount >= shuffleIntervalCycles) {
-                pollCycleCount = 0;
-                shuffleTiles();
-              }
-
             } catch (e) {
               handleFailure();
             }
@@ -804,32 +793,6 @@
       if (consecutiveFailures >= failureThreshold) {
         enterSleepMode();
       }
-    }
-
-    function shuffleTiles() {
-      var cells = [];
-      for (var i = 0; i < 6; i++) {
-        var cell = document.getElementById('cell-' + i);
-        if (cell && cell.firstElementChild) {
-          cells.push(cell.firstElementChild);
-        }
-      }
-
-      for (var j = cells.length - 1; j > 0; j--) {
-        var k = Math.floor(Math.random() * (j + 1));
-        var temp = cells[j];
-        cells[j] = cells[k];
-        cells[k] = temp;
-      }
-
-      for (var m = 0; m < 6; m++) {
-        var targetCell = document.getElementById('cell-' + m);
-        if (targetCell && cells[m]) {
-          targetCell.appendChild(cells[m]);
-        }
-      }
-
-      clearGhosting();
     }
 
     function getViewportDimensions() {
@@ -874,16 +837,21 @@
       rotator.style.webkitTransformOrigin = '0 0';
       rotator.style.transformOrigin = '0 0';
 
+      var degElem = document.getElementById('val-rot-deg');
+      var orientElem = document.getElementById('val-rot-orient');
+
       if (currentRotation === '90') {
         var transformStr = 'translate(' + safeLandscapeH + 'px, 0px) rotate(90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
-        document.getElementById('val-rot-label').innerText = '90° 画面回転';
+        if (degElem) degElem.innerText = '90';
+        if (orientElem) orientElem.innerText = 'LANDSCAPE';
       } else if (currentRotation === '270') {
         var transformStr = 'translate(0px, ' + safeLandscapeW + 'px) rotate(-90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
-        document.getElementById('val-rot-label').innerText = '270° 画面回転';
+        if (degElem) degElem.innerText = '270';
+        if (orientElem) orientElem.innerText = 'LANDSCAPE';
       } else {
         // '0' (Portrait)
         rotator.style.width = (w - 8) + 'px';
@@ -892,7 +860,8 @@
         rotator.style.top = '4px';
         rotator.style.webkitTransform = 'none';
         rotator.style.transform = 'none';
-        document.getElementById('val-rot-label').innerText = '0° 画面回転';
+        if (degElem) degElem.innerText = '0';
+        if (orientElem) orientElem.innerText = 'PORTRAIT';
       }
 
       window.scrollTo(0, 0);

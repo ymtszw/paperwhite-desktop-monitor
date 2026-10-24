@@ -21,6 +21,148 @@ use sysinfo::{Components, Disks, System};
 use tokio::sync::RwLock;
 
 #[cfg(windows)]
+mod win_thermal {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use std::ptr::null_mut;
+
+    #[repr(C)]
+    struct PdhFmtCounterValue {
+        c_status: u32,
+        _pad: u32,
+        double_value: f64,
+    }
+
+    #[link(name = "pdh")]
+    unsafe extern "system" {
+        fn PdhOpenQueryW(
+            szDataSource: *const u16,
+            dwUserData: usize,
+            phQuery: *mut *mut std::ffi::c_void,
+        ) -> i32;
+
+        fn PdhAddCounterW(
+            hQuery: *mut std::ffi::c_void,
+            szFullCounterPath: *const u16,
+            dwUserData: usize,
+            phCounter: *mut *mut std::ffi::c_void,
+        ) -> i32;
+
+        fn PdhAddEnglishCounterW(
+            hQuery: *mut std::ffi::c_void,
+            szFullCounterPath: *const u16,
+            dwUserData: usize,
+            phCounter: *mut *mut std::ffi::c_void,
+        ) -> i32;
+
+        fn PdhCollectQueryData(hQuery: *mut std::ffi::c_void) -> i32;
+
+        fn PdhGetFormattedCounterValue(
+            hCounter: *mut std::ffi::c_void,
+            dwFormat: u32,
+            lpdwType: *mut u32,
+            pValue: *mut PdhFmtCounterValue,
+        ) -> i32;
+
+        fn PdhCloseQuery(hQuery: *mut std::ffi::c_void) -> i32;
+    }
+
+    const PDH_FMT_DOUBLE: u32 = 0x00000200;
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    }
+
+    pub struct ThermalReader {
+        query: *mut std::ffi::c_void,
+        counter: *mut std::ffi::c_void,
+    }
+
+    unsafe impl Send for ThermalReader {}
+
+    impl ThermalReader {
+        pub fn new() -> Option<Self> {
+            unsafe {
+                let mut query = null_mut();
+                let q_res = PdhOpenQueryW(null_mut(), 0, &mut query);
+                if q_res != 0 {
+                    crate::app_error(&format!("PdhOpenQueryW failed: 0x{:X}", q_res));
+                    return None;
+                }
+
+                let candidates = [
+                    r"\Thermal Zone Information(\_TZ.TZ00)\Temperature",
+                    r"\Thermal Zone Information(\_tz.tz00)\Temperature",
+                    r"\Thermal Zone Information(*)\Temperature",
+                ];
+
+                let mut counter = null_mut();
+                let mut added = false;
+
+                for c_path in &candidates {
+                    let path = to_wide(c_path);
+                    if PdhAddEnglishCounterW(query, path.as_ptr(), 0, &mut counter) == 0 {
+                        crate::app_log(&format!("PdhAddEnglishCounterW succeeded for {}", c_path));
+                        added = true;
+                        break;
+                    }
+                    if PdhAddCounterW(query, path.as_ptr(), 0, &mut counter) == 0 {
+                        crate::app_log(&format!("PdhAddCounterW succeeded for {}", c_path));
+                        added = true;
+                        break;
+                    }
+                }
+
+                if !added {
+                    crate::app_error("Failed to add thermal counter to PDH query");
+                    PdhCloseQuery(query);
+                    return None;
+                }
+
+                let _ = PdhCollectQueryData(query);
+                Some(Self { query, counter })
+            }
+        }
+
+        pub fn read_celsius(&self) -> Option<u32> {
+            unsafe {
+                if PdhCollectQueryData(self.query) == 0 {
+                    let mut val = PdhFmtCounterValue {
+                        c_status: 0,
+                        _pad: 0,
+                        double_value: 0.0,
+                    };
+                    let mut val_type = 0;
+                    if PdhGetFormattedCounterValue(
+                        self.counter,
+                        PDH_FMT_DOUBLE,
+                        &mut val_type,
+                        &mut val,
+                    ) == 0 {
+                        let kelvin = val.double_value;
+                        if kelvin > 200.0 && kelvin < 400.0 {
+                            let c = kelvin - 273.15;
+                            return Some(c.round() as u32);
+                        }
+                    }
+                }
+                None
+            }
+        }
+    }
+
+    impl Drop for ThermalReader {
+        fn drop(&mut self) {
+            unsafe {
+                if !self.query.is_null() {
+                    PdhCloseQuery(self.query);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
 mod win_eventlog {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
@@ -305,6 +447,8 @@ async fn main() {
         let mut networks = sysinfo::Networks::new_with_refreshed_list();
         let mut components = Components::new_with_refreshed_list();
         let nvml = nvml_wrapper::Nvml::init().ok();
+        #[cfg(windows)]
+        let thermal_reader = win_thermal::ThermalReader::new();
 
         let hostname = System::host_name().unwrap_or_else(|| "PC".to_string());
         let os_str = format!(
@@ -349,17 +493,13 @@ async fn main() {
             networks.refresh(true);
             components.refresh(true);
 
-            // CPU Temperature if available from components
-            let cpu_temp: Option<u32> = components.iter().find_map(|c| {
-                let label = c.label().to_lowercase();
-                if label.contains("cpu") || label.contains("core") || label.contains("package") || label.contains("tz") {
-                    c.temperature().map(|t| t.round() as u32)
-                } else {
-                    None
-                }
-            }).or_else(|| {
-                components.iter().next().and_then(|c| c.temperature().map(|t| t.round() as u32))
+            // CPU / Thermal Zone Temperature (PDH native on Windows)
+            #[cfg(windows)]
+            let cpu_temp: Option<u32> = thermal_reader.as_ref().and_then(|t| t.read_celsius()).or_else(|| {
+                components.iter().find_map(|c| c.temperature().map(|t| t.round() as u32))
             });
+            #[cfg(not(windows))]
+            let cpu_temp: Option<u32> = components.iter().find_map(|c| c.temperature().map(|t| t.round() as u32));
 
             // 1. CPU
             let instant_cpu = sys.global_cpu_usage();
