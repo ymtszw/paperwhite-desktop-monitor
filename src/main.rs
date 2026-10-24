@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use axum::{
     extract::{ConnectInfo, Request},
     http::{header, HeaderValue, StatusCode},
@@ -9,12 +11,115 @@ use axum::{
 use serde::Serialize;
 use std::{
     collections::VecDeque,
+    fs::OpenOptions,
+    io::Write,
     net::{IpAddr, SocketAddr},
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use sysinfo::{Disks, System};
 use tokio::sync::RwLock;
+
+#[cfg(windows)]
+mod win_eventlog {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use std::ptr::null_mut;
+
+    #[link(name = "advapi32")]
+    unsafe extern "system" {
+        fn RegisterEventSourceW(
+            lpUNCServerName: *const u16,
+            lpSourceName: *const u16,
+        ) -> *mut std::ffi::c_void;
+
+        fn ReportEventW(
+            hEventLog: *mut std::ffi::c_void,
+            wType: u16,
+            wCategory: u16,
+            dwEventID: u32,
+            lpUserSid: *mut std::ffi::c_void,
+            wNumStrings: u16,
+            dwDataSize: u32,
+            lpStrings: *const *const u16,
+            lpRawData: *mut std::ffi::c_void,
+        ) -> i32;
+
+        fn DeregisterEventSource(hEventLog: *mut std::ffi::c_void) -> i32;
+    }
+
+    const EVENTLOG_INFORMATION_TYPE: u16 = 4;
+    const EVENTLOG_ERROR_TYPE: u16 = 1;
+
+    fn to_wide(s: &str) -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    }
+
+    pub fn write_event(msg: &str, is_error: bool) {
+        unsafe {
+            let source = to_wide("Application");
+            let handle = RegisterEventSourceW(null_mut(), source.as_ptr());
+            if !handle.is_null() {
+                let formatted = format!("[KindleDesktopMonitor] {}", msg);
+                let wide_msg = to_wide(&formatted);
+                let strings = [wide_msg.as_ptr()];
+                let event_type = if is_error {
+                    EVENTLOG_ERROR_TYPE
+                } else {
+                    EVENTLOG_INFORMATION_TYPE
+                };
+
+                ReportEventW(
+                    handle,
+                    event_type,
+                    0,
+                    1000,
+                    null_mut(),
+                    1,
+                    0,
+                    strings.as_ptr(),
+                    null_mut(),
+                );
+
+                DeregisterEventSource(handle);
+            }
+        }
+    }
+}
+
+// Global logger combining file and Windows Event Log
+static LOG_LOCK: Mutex<()> = Mutex::new(());
+
+pub fn app_log(msg: &str) {
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let line = format!("[{}] {}\n", now, msg);
+
+    if let Ok(_guard) = LOG_LOCK.lock() {
+        // Write to logs/server.log
+        let _ = std::fs::create_dir_all("logs");
+        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("logs/server.log") {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
+
+    #[cfg(windows)]
+    win_eventlog::write_event(msg, false);
+}
+
+pub fn app_error(msg: &str) {
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let line = format!("[{}] [ERROR] {}\n", now, msg);
+
+    if let Ok(_guard) = LOG_LOCK.lock() {
+        let _ = std::fs::create_dir_all("logs");
+        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("logs/server.log") {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
+
+    #[cfg(windows)]
+    win_eventlog::write_event(msg, true);
+}
 
 // Embedded dashboard HTML
 const INDEX_HTML: &str = include_str!("../static/index.html");
@@ -83,7 +188,7 @@ async fn lan_access_middleware(
     next: Next,
 ) -> Response {
     if !is_local_or_lan(addr.ip()) {
-        eprintln!("[BLOCKED] Access denied from non-LAN IP: {}", addr);
+        app_error(&format!("[BLOCKED] Access denied from non-LAN IP: {}", addr));
         return (
             StatusCode::FORBIDDEN,
             "403 Forbidden: Access is restricted to local LAN only.",
@@ -108,13 +213,29 @@ async fn serve_index() -> impl IntoResponse {
     )
 }
 
+/// Serve recent logs
+async fn serve_logs() -> impl IntoResponse {
+    let content = std::fs::read_to_string("logs/server.log").unwrap_or_else(|_| "No logs recorded yet.".to_string());
+    (
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("text/plain; charset=utf-8"),
+        ),
+        (
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+        )],
+        content,
+    )
+}
+
 /// Serve status API endpoint
 async fn serve_status(
     axum::extract::State(state): axum::extract::State<Arc<RwLock<SystemStatus>>>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
     if let (Some(win_h), Some(scr_h)) = (params.get("winH"), params.get("scrH")) {
-        println!(
+        app_log(&format!(
             "[Kindle Telemetry] win: {}x{}, docClient: {}x{}, scroll: {}x{}, sTop={}, sLeft={}, rot={}",
             params.get("winW").unwrap_or(&"-".to_string()),
             win_h,
@@ -125,7 +246,7 @@ async fn serve_status(
             params.get("sTop").unwrap_or(&"0".to_string()),
             params.get("sLeft").unwrap_or(&"0".to_string()),
             params.get("rot").unwrap_or(&"-".to_string()),
-        );
+        ));
     }
     let status = state.read().await.clone();
     (
@@ -153,16 +274,10 @@ async fn main() {
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    println!("======================================================");
-    println!("  Kindle Paperwhite Desktop Monitor Server (Rust)");
-    println!("======================================================");
-    println!("* Instance ID:           {}", instance_id);
-    println!("* Moving Average:        Enabled (30s window)");
-    println!("* Auto-Reload on Update: Enabled");
-    println!("* Server Port:           {}", port);
-    println!("* PC LAN IP:             {}", local_ip);
-    println!(">> Kindle URL:           http://{}:{}/", local_ip, port);
-    println!("======================================================");
+    app_log(&format!(
+        "Server started. Instance ID: {}, Port: {}, LAN IP: {}",
+        instance_id, port, local_ip
+    ));
 
     let shared_status = Arc::new(RwLock::new(SystemStatus {
         server_instance: instance_id,
@@ -274,6 +389,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(serve_index))
         .route("/api/status", get(serve_status))
+        .route("/api/logs", get(serve_logs))
         .layer(middleware::from_fn(lan_access_middleware))
         .with_state(shared_status);
 
@@ -281,10 +397,12 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(bind_addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to bind TCP listener on {}: {}", bind_addr, e);
+            app_error(&format!("Failed to bind TCP listener on {}: {}", bind_addr, e));
             std::process::exit(1);
         }
     };
+
+    app_log(&format!("Server listening on {} (LAN: {})", bind_addr, local_ip));
 
     if let Err(e) = axum::serve(
         listener,
@@ -292,6 +410,6 @@ async fn main() {
     )
     .await
     {
-        eprintln!("Server error: {}", e);
+        app_error(&format!("Server error: {}", e));
     }
 }
