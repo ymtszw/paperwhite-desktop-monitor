@@ -278,59 +278,8 @@ pub fn app_error(msg: &str) {
     win_eventlog::write_event(msg, true);
 }
 
-#[cfg(windows)]
-mod win_fans {
-    use super::FanInfo;
-    use serde::Deserialize;
-    use wmi::WMIConnection;
-
-    #[derive(Deserialize, Debug, Clone)]
-    #[serde(rename_all = "PascalCase")]
-    struct WmiSensor {
-        name: String,
-        value: f32,
-    }
-
-    pub fn query_fans() -> (Option<u32>, Vec<FanInfo>) {
-        let mut cpu_fan: Option<u32> = None;
-        let mut case_fans: Vec<FanInfo> = Vec::new();
-
-        let namespaces = ["ROOT\\LibreHardwareMonitor", "ROOT\\OpenHardwareMonitor"];
-        for ns in namespaces {
-            if let Ok(wmi_con) = WMIConnection::with_namespace_path(ns) {
-                let query = "SELECT Name, Value FROM Sensor WHERE SensorType = 'Fan'";
-                if let Ok(sensors) = wmi_con.raw_query::<WmiSensor>(query)
-                    && !sensors.is_empty()
-                {
-                    for s in sensors {
-                        let rpm = s.value.round() as u32;
-                        let lower = s.name.to_lowercase();
-                        if lower.contains("cpu") {
-                            if cpu_fan.is_none() || (cpu_fan == Some(0) && rpm > 0) {
-                                cpu_fan = Some(rpm);
-                            }
-                        } else if !lower.contains("gpu") {
-                            case_fans.push(FanInfo { name: s.name, rpm });
-                        }
-                    }
-                    case_fans.sort_by_key(|f| f.name.to_uppercase());
-                    return (cpu_fan, case_fans);
-                }
-            }
-        }
-
-        (cpu_fan, case_fans)
-    }
-}
-
 // Embedded dashboard HTML
 const INDEX_HTML: &str = include_str!("../static/index.html");
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FanInfo {
-    pub name: String,
-    pub rpm: u32,
-}
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct DiskInfo {
@@ -381,6 +330,7 @@ pub struct SystemStatus {
     pub server_ip: String,
     pub server_port: u16,
     pub sys_temp: Option<u32>,
+    pub uptime_secs: u64,
 
     // Synology NAS (DS223j)
     pub nas: Option<NasStats>,
@@ -390,7 +340,6 @@ pub struct SystemStatus {
     pub cpu_cores: usize,
     pub cpu_temp: Option<u32>,
     pub cpu_history: Vec<f32>, // 20 points (0..100)
-    pub cpu_fan: Option<u32>,
 
     // GPU
     pub gpu_usage: f32, // smoothed %
@@ -416,9 +365,6 @@ pub struct SystemStatus {
 
     // All Non-removable Disks (sorted A-Z)
     pub disks: Vec<DiskInfo>,
-
-    // Case / System Fans (Multiple headers)
-    pub fans: Vec<FanInfo>,
 }
 
 /// Check if the connecting IP is a loopback or private LAN address
@@ -605,8 +551,6 @@ async fn main() {
             .build()
             .unwrap_or_default();
         let mut last_nas_stats: Option<NasStats> = None;
-        let mut last_cpu_fan: Option<u32> = None;
-        let mut last_case_fans: Vec<FanInfo> = Vec::new();
 
         let mut second_counter: u64 = 0;
 
@@ -761,21 +705,6 @@ async fn main() {
                 } else if let Some(ref mut st) = last_nas_stats {
                     st.online = false;
                 }
-
-                // Query Hardware Fan sensors via WMI (LibreHardwareMonitor / OpenHardwareMonitor)
-                #[cfg(windows)]
-                {
-                    if let Ok((c_fan, c_fans)) =
-                        tokio::task::spawn_blocking(win_fans::query_fans).await
-                    {
-                        if c_fan.is_some() {
-                            last_cpu_fan = c_fan;
-                        }
-                        if !c_fans.is_empty() {
-                            last_case_fans = c_fans;
-                        }
-                    }
-                }
             }
 
             // 5. Disks (all non-removable, sorted by name A-Z)
@@ -815,12 +744,12 @@ async fn main() {
                 lock.server_ip = local_ip_clone.clone();
                 lock.server_port = port;
                 lock.sys_temp = cpu_temp;
+                lock.uptime_secs = System::uptime();
 
                 lock.cpu_usage = cpu_avg;
                 lock.cpu_cores = cpu_cores;
                 lock.cpu_temp = cpu_temp;
                 lock.cpu_history = cpu_hist.iter().copied().collect();
-                lock.cpu_fan = last_cpu_fan;
 
                 lock.gpu_usage = gpu_avg;
                 lock.gpu_name = gpu_name.clone();
@@ -843,7 +772,6 @@ async fn main() {
 
                 lock.disks = disk_list;
                 lock.nas = last_nas_stats.clone();
-                lock.fans = last_case_fans.clone();
             }
 
             tokio::time::sleep(Duration::from_secs(1)).await;
