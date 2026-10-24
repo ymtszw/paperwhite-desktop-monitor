@@ -307,6 +307,59 @@
     }
 
     /* ========================================================
+       NAS Dedicated Tile Styling (Inverted Dark Header + Dashed Network Dividers)
+       ======================================================== */
+    .tile-box.tile-nas {
+      border: 3px solid #000000;
+      background-color: #ffffff;
+    }
+
+    .tile-box.tile-nas .tile-top {
+      background-color: #000000;
+      color: #ffffff;
+      margin: -6px -10px 4px -10px;
+      padding: 4px 10px 3px 10px;
+      border-bottom: none;
+    }
+
+    .tile-box.tile-nas .tile-title {
+      color: #ffffff;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+    }
+
+    .tile-box.tile-nas .hist-container {
+      border-top: 2px dashed #000000;
+    }
+
+    .nas-dashed-row {
+      border-top: 2px dashed #000000;
+    }
+
+    .nas-status-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      font-size: 0.85rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      line-height: 1.2;
+      border-radius: 2px;
+      vertical-align: middle;
+    }
+
+    .nas-status-badge.nas-online {
+      background-color: #000000;
+      color: #ffffff;
+      border: 1px solid #000000;
+    }
+
+    .nas-status-badge.nas-offline {
+      background-color: #ffffff;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+
+    /* ========================================================
        PC Sleep Fullscreen Card (Bold E-ink Typography)
        ======================================================== */
     #sleep-overlay {
@@ -533,7 +586,7 @@
         <tr>
           <!-- Cell 6: NAS SYSTEM (DS223j) -->
           <td class="tile-cell" id="cell-6">
-            <div class="tile-box" id="tile-nas-sys">
+            <div class="tile-box tile-nas" id="tile-nas-sys">
               <div class="tile-top">
                 <div class="tile-title">NAS SYS</div>
               </div>
@@ -554,7 +607,7 @@
 
           <!-- Cell 7: NAS STORAGE & NETWORK (DS223j) -->
           <td class="tile-cell" id="cell-7">
-            <div class="tile-box" id="tile-nas-storage">
+            <div class="tile-box tile-nas" id="tile-nas-storage">
               <div class="tile-top">
                 <div class="tile-title">NAS VOL / NW</div>
               </div>
@@ -568,7 +621,7 @@
                     <div class="disk-fill" id="val-nas-disk-fill" style="width: 0%;"></div>
                   </div>
                 </div>
-                <div style="display: table; width: 100%; border-top: 1px solid #000; padding-top: 3px; margin-top: 4px;">
+                <div class="nas-dashed-row" style="display: table; width: 100%; padding-top: 3px; margin-top: 4px;">
                   <div style="display: table-cell; font-size: 1.1rem; font-weight: 900;">
                     ↓ <span id="val-nas-net-in">0.0</span> <span style="font-size: 0.8rem;" id="val-nas-net-in-unit">KB/s</span>
                   </div>
@@ -577,9 +630,11 @@
                   </div>
                 </div>
               </div>
-              <div style="border-top: 2px solid #000; padding-top: 4px; margin-top: auto; display: table; width: 100%;">
-                <span style="display: table-cell; font-size: 0.95rem; font-weight: 900;">LOAD: <span id="val-nas-load">0.00</span></span>
-                <span style="display: table-cell; text-align: right; font-size: 0.95rem; font-weight: 900;" id="val-nas-status">ONLINE</span>
+              <div class="nas-dashed-row" style="padding-top: 4px; margin-top: auto; display: table; width: 100%;">
+                <span style="display: table-cell; font-size: 0.95rem; font-weight: 900; vertical-align: middle;">LOAD: <span id="val-nas-load">0.00</span></span>
+                <span style="display: table-cell; text-align: right; vertical-align: middle;">
+                  <span class="nas-status-badge nas-online" id="val-nas-status">ONLINE</span>
+                </span>
               </div>
             </div>
           </td>
@@ -825,10 +880,22 @@
         document.getElementById('val-nas-net-out-unit').innerText = nasOut.unit;
 
         document.getElementById('val-nas-load').innerText = (nas.systemLoad1 || 0).toFixed(2);
-        document.getElementById('val-nas-status').innerText = (nas.online ? 'ONLINE' : 'OFFLINE');
+        var statElem = document.getElementById('val-nas-status');
+        if (statElem) {
+          if (nas.online) {
+            statElem.innerText = 'ONLINE';
+            statElem.className = 'nas-status-badge nas-online';
+          } else {
+            statElem.innerText = 'OFFLINE';
+            statElem.className = 'nas-status-badge nas-offline';
+          }
+        }
       } else {
         var nasStatElem = document.getElementById('val-nas-status');
-        if (nasStatElem) nasStatElem.innerText = 'OFFLINE';
+        if (nasStatElem) {
+          nasStatElem.innerText = 'OFFLINE';
+          nasStatElem.className = 'nas-status-badge nas-offline';
+        }
       }
     }
 
