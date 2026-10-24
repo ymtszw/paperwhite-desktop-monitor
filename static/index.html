@@ -233,33 +233,23 @@
       z-index: 9999;
       padding: 16px;
       box-sizing: border-box;
-      -webkit-box-orient: vertical;
-      flex-direction: column;
-      -webkit-box-align: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      justify-content: center;
       text-align: center;
-      gap: 10px;
     }
 
     .sleep-icon {
       font-size: 3.2rem;
       line-height: 1;
       font-weight: 900;
+      margin-bottom: 6px;
     }
 
     .sleep-box {
       border: 4px solid #000000;
-      padding: 14px 18px;
-      max-width: 400px;
-      width: 88%;
+      padding: 16px 20px;
+      max-width: 440px;
+      margin: 40px auto 0 auto;
       background-color: #ffffff;
-      display: -webkit-box;
-      display: flex;
-      -webkit-box-orient: vertical;
-      flex-direction: column;
-      gap: 6px;
+      text-align: center;
     }
 
     .sleep-title {
@@ -453,7 +443,7 @@
               </div>
               <div class="tile-top" style="border-top: 1px dashed #000; border-bottom: none; padding-top: 2px;">
                 <span class="tile-sub" id="diag-scroll-stats">T:0 L:0</span>
-                <span class="tile-sub" id="diag-scr-h">Scr:--</span>
+                <button class="adj-btn" style="font-size:0.7rem; padding:1px 5px;" onclick="testSleepMode(); event.stopPropagation();">☾ テスト</button>
               </div>
             </div>
           </td>
@@ -586,8 +576,9 @@
       sleepStartTime = new Date();
 
       var sleepOverlay = document.getElementById('sleep-overlay');
-      sleepOverlay.style.display = '-webkit-box';
-      sleepOverlay.style.display = 'flex';
+      if (sleepOverlay) {
+        sleepOverlay.style.display = 'block';
+      }
 
       if (lastSuccessTime) {
         document.getElementById('sleep-last-seen').innerText = formatTime(lastSuccessTime);
@@ -596,6 +587,7 @@
       }
 
       updateSleepStatus();
+      clearGhosting();
     }
 
     function exitSleepMode() {
@@ -605,9 +597,18 @@
       retryCount = 0;
 
       var sleepOverlay = document.getElementById('sleep-overlay');
-      sleepOverlay.style.display = 'none';
+      if (sleepOverlay) {
+        sleepOverlay.style.display = 'none';
+      }
 
       clearGhosting();
+    }
+
+    function testSleepMode() {
+      enterSleepMode();
+      setTimeout(function() {
+        exitSleepMode();
+      }, 15000);
     }
 
     function updateSleepStatus() {
@@ -644,49 +645,68 @@
 
       var xhr = new XMLHttpRequest();
       xhr.open('GET', '/api/status?nocache=' + new Date().getTime() + telemetry, true);
-      xhr.timeout = 5000;
 
-      xhr.onload = function() {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            var data = JSON.parse(xhr.responseText);
+      var reqFinished = false;
+      var timer = setTimeout(function() {
+        if (!reqFinished) {
+          reqFinished = true;
+          try { xhr.abort(); } catch(e) {}
+          handleFailure();
+        }
+      }, 4000);
 
-            if (data.server_instance) {
-              if (serverInstanceId === null) {
-                serverInstanceId = data.server_instance;
-              } else if (serverInstanceId !== data.server_instance) {
-                window.location.href = window.location.pathname + '?r=' + new Date().getTime();
-                return;
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (reqFinished) return;
+          reqFinished = true;
+          clearTimeout(timer);
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              var data = JSON.parse(xhr.responseText);
+
+              if (data.server_instance) {
+                if (serverInstanceId === null) {
+                  serverInstanceId = data.server_instance;
+                } else if (serverInstanceId !== data.server_instance) {
+                  window.location.href = window.location.pathname + '?r=' + new Date().getTime();
+                  return;
+                }
               }
+
+              consecutiveFailures = 0;
+              lastSuccessTime = new Date();
+
+              if (isSleeping) {
+                exitSleepMode();
+              }
+
+              renderStatus(data);
+
+              pollCycleCount++;
+              if (pollCycleCount >= shuffleIntervalCycles) {
+                pollCycleCount = 0;
+                shuffleTiles();
+              }
+
+            } catch (e) {
+              handleFailure();
             }
-
-            consecutiveFailures = 0;
-            lastSuccessTime = new Date();
-
-            if (isSleeping) {
-              exitSleepMode();
-            }
-
-            renderStatus(data);
-
-            pollCycleCount++;
-            if (pollCycleCount >= shuffleIntervalCycles) {
-              pollCycleCount = 0;
-              shuffleTiles();
-            }
-
-          } catch (e) {
+          } else {
             handleFailure();
           }
-        } else {
-          handleFailure();
         }
       };
 
-      xhr.onerror = function() { handleFailure(); };
-      xhr.ontimeout = function() { handleFailure(); };
-
-      xhr.send();
+      try {
+        xhr.send();
+      } catch(e) {
+        if (!reqFinished) {
+          reqFinished = true;
+          clearTimeout(timer);
+          handleFailure();
+        }
+      }
     }
 
     function handleFailure() {
