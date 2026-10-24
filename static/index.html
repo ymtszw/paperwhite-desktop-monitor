@@ -239,7 +239,7 @@
 
     .system-action-box {
       width: 100%;
-      height: 96px;
+      height: 76px;
       border: 3px solid #000000;
       background-color: #000000;
       color: #ffffff;
@@ -255,19 +255,20 @@
       box-sizing: border-box;
       flex-shrink: 0;
       margin-top: auto;
+      border-radius: 2px;
     }
 
     .system-action-icon {
-      font-size: 2.8rem;
+      font-size: 2.2rem;
       line-height: 1;
       font-weight: 900;
     }
 
     .system-action-btn-text {
-      font-size: 1.15rem;
+      font-size: 1.05rem;
       font-weight: 900;
       letter-spacing: 1px;
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     /* ========================================================
@@ -477,16 +478,16 @@
               </div>
               <div class="tile-mid">
                 <div class="tile-num-wrap">
-                  <span class="tile-num" id="val-rot-deg">90</span><span class="tile-pct">°</span>
+                  <span class="tile-num" id="val-rot-deg" style="font-size: 3.2rem; font-family: inherit;">90</span><span class="tile-pct" style="font-size: 1.8rem;">°</span>
                 </div>
                 <div class="tile-sub-stat">
-                  <div>ROTATION</div>
-                  <div id="val-rot-orient">LANDSCAPE</div>
+                  <div>SCREEN</div>
+                  <div id="val-rot-orient">横向き</div>
                 </div>
               </div>
               <div class="system-action-box">
                 <div class="system-action-icon">⟳</div>
-                <div class="system-action-btn-text">画面回転を切替</div>
+                <div class="system-action-btn-text">タップで回転</div>
               </div>
             </div>
           </td>
@@ -845,13 +846,13 @@
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
         if (degElem) degElem.innerText = '90';
-        if (orientElem) orientElem.innerText = 'LANDSCAPE';
+        if (orientElem) orientElem.innerText = '横向き';
       } else if (currentRotation === '270') {
         var transformStr = 'translate(0px, ' + safeLandscapeW + 'px) rotate(-90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
         if (degElem) degElem.innerText = '270';
-        if (orientElem) orientElem.innerText = 'LANDSCAPE';
+        if (orientElem) orientElem.innerText = '横向き';
       } else {
         // '0' (Portrait)
         rotator.style.width = (w - 8) + 'px';
@@ -861,7 +862,7 @@
         rotator.style.webkitTransform = 'none';
         rotator.style.transform = 'none';
         if (degElem) degElem.innerText = '0';
-        if (orientElem) orientElem.innerText = 'PORTRAIT';
+        if (orientElem) orientElem.innerText = '縦向き';
       }
 
       window.scrollTo(0, 0);
