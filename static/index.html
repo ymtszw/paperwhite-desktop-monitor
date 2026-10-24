@@ -655,6 +655,9 @@
                     ↑ <span id="val-nas-net-out">0.0</span> <span style="font-size: 0.8rem;" id="val-nas-net-out-unit">KB/s</span>
                   </div>
                 </div>
+                <div class="nas-dashed-row" style="padding-top: 3px; margin-top: 4px; font-size: 0.95rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="val-nas-hdd-status">
+                  HDD1: --°C (NORMAL)
+                </div>
               </div>
               <div class="nas-dashed-row" style="padding-top: 4px; margin-top: auto; display: table; width: 100%;">
                 <span style="display: table-cell; font-size: 0.95rem; font-weight: 900; vertical-align: middle;">LOAD: <span id="val-nas-load">0.00</span></span>
@@ -920,6 +923,16 @@
         document.getElementById('val-nas-net-in-unit').innerText = nasIn.unit;
         document.getElementById('val-nas-net-out').innerText = nasOut.val;
         document.getElementById('val-nas-net-out-unit').innerText = nasOut.unit;
+
+        var hddText = 'HDD: --';
+        if (nas.hdd1Temp) {
+          hddText = 'HDD1: ' + Math.round(nas.hdd1Temp) + '°C (' + (nas.hdd1Status || 'normal').toUpperCase() + ')';
+          if (nas.hdd2Temp) {
+            hddText += ' · HDD2: ' + Math.round(nas.hdd2Temp) + '°C (' + (nas.hdd2Status || 'normal').toUpperCase() + ')';
+          }
+        }
+        var hddElem = document.getElementById('val-nas-hdd-status');
+        if (hddElem) hddElem.innerText = hddText;
 
         document.getElementById('val-nas-load').innerText = (nas.systemLoad1 || 0).toFixed(2);
         var statElem = document.getElementById('val-nas-status');

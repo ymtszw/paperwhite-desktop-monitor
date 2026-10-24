@@ -316,6 +316,14 @@ pub struct NasStats {
     pub net_out_kb: f64,
     #[serde(rename = "tempC")]
     pub temp_c: f64,
+    #[serde(rename = "hdd1Temp", default)]
+    pub hdd1_temp: f64,
+    #[serde(rename = "hdd1Status", default)]
+    pub hdd1_status: String,
+    #[serde(rename = "hdd2Temp", default)]
+    pub hdd2_temp: f64,
+    #[serde(rename = "hdd2Status", default)]
+    pub hdd2_status: String,
     #[serde(default)]
     pub online: bool,
     #[serde(default)]
