@@ -522,7 +522,7 @@
                   <span class="tile-num" id="val-gpu-num">0</span><span class="tile-pct">%</span>
                 </div>
                 <div class="tile-sub-stat">
-                  <div><span id="val-gpu-temp">--°C</span><span id="val-gpu-fan-wrap" style="display: none;"> · <span id="val-gpu-fan">--</span></span></div>
+                  <div><span id="val-gpu-temp">--°C</span> · <span id="val-gpu-fan">-- RPM</span></div>
                   <div><strong id="val-gpu-vram">0</strong>G / <span id="val-gpu-vram-total">--</span>G</div>
                 </div>
               </div>
@@ -810,13 +810,13 @@
       }
       document.getElementById('val-gpu-temp').innerText = (data.gpu_temp ? data.gpu_temp + '°C' : '--°C');
       var gpuFanElem = document.getElementById('val-gpu-fan');
-      var gpuFanWrap = document.getElementById('val-gpu-fan-wrap');
-      if (gpuFanElem && gpuFanWrap) {
-        if (data.gpu_fan !== null && data.gpu_fan !== undefined) {
-          gpuFanElem.innerText = 'FAN ' + data.gpu_fan + '%';
-          gpuFanWrap.style.display = 'inline';
+      if (gpuFanElem) {
+        if (data.gpu_fan_rpm !== null && data.gpu_fan_rpm !== undefined) {
+          gpuFanElem.innerText = data.gpu_fan_rpm + ' RPM';
+        } else if (data.gpu_fan !== null && data.gpu_fan !== undefined) {
+          gpuFanElem.innerText = data.gpu_fan + '%';
         } else {
-          gpuFanWrap.style.display = 'none';
+          gpuFanElem.innerText = '-- RPM';
         }
       }
       updateHistoryChart('hist-gpu', data.gpu_history, 100);

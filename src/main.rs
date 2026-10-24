@@ -400,6 +400,7 @@ pub struct SystemStatus {
     pub gpu_temp: u32,
     pub gpu_history: Vec<f32>, // 20 points (0..100)
     pub gpu_fan: Option<u32>,
+    pub gpu_fan_rpm: Option<u32>,
 
     // RAM
     pub mem_total_gb: f64,
@@ -661,6 +662,7 @@ async fn main() {
             let mut vram_total_gb = 0.0f64;
             let mut gpu_temp = 0u32;
             let mut gpu_fan: Option<u32> = None;
+            let mut gpu_fan_rpm: Option<u32> = None;
             if let Some(ref n) = nvml
                 && let Ok(dev) = n.device_by_index(0)
             {
@@ -675,6 +677,9 @@ async fn main() {
                     dev.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
                 {
                     gpu_temp = temp;
+                }
+                if let Ok(rpm) = dev.fan_speed_rpm(0) {
+                    gpu_fan_rpm = Some(rpm);
                 }
                 if let Ok(fan) = dev.fan_speed(0) {
                     gpu_fan = Some(fan);
@@ -824,6 +829,7 @@ async fn main() {
                 lock.gpu_temp = gpu_temp;
                 lock.gpu_history = gpu_hist.iter().copied().collect();
                 lock.gpu_fan = gpu_fan;
+                lock.gpu_fan_rpm = gpu_fan_rpm;
 
                 lock.mem_total_gb = total_mem_gb;
                 lock.mem_used_gb = used_mem_gb;
@@ -876,5 +882,17 @@ async fn main() {
     .await
     {
         app_error(&format!("Server error: {}", e));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_nvml_rpm() {
+        if let Ok(nvml) = nvml_wrapper::Nvml::init()
+            && let Ok(dev) = nvml.device_by_index(0)
+        {
+            let _ = dev.fan_speed_rpm(0);
+        }
     }
 }
