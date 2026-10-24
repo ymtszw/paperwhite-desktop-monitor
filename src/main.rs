@@ -263,8 +263,62 @@ pub fn app_error(msg: &str) {
     win_eventlog::write_event(msg, true);
 }
 
+#[cfg(windows)]
+mod win_fans {
+    use super::FanInfo;
+    use serde::Deserialize;
+    use wmi::WMIConnection;
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(rename_all = "PascalCase")]
+    struct WmiSensor {
+        name: String,
+        value: f32,
+        sensor_type: String,
+        #[serde(default)]
+        identifier: String,
+    }
+
+    pub fn query_fans() -> (Option<u32>, Vec<FanInfo>) {
+        let mut cpu_fan: Option<u32> = None;
+        let mut case_fans: Vec<FanInfo> = Vec::new();
+
+        let namespaces = ["ROOT\\LibreHardwareMonitor", "ROOT\\OpenHardwareMonitor"];
+        for ns in namespaces {
+            if let Ok(wmi_con) = WMIConnection::with_namespace_path(ns) {
+                let query = "SELECT Name, Value, SensorType, Identifier FROM Sensor WHERE SensorType = 'Fan'";
+                if let Ok(sensors) = wmi_con.raw_query::<WmiSensor>(query) {
+                    if !sensors.is_empty() {
+                        for s in sensors {
+                            let rpm = s.value.round() as u32;
+                            let lower = s.name.to_lowercase();
+                            if lower.contains("cpu") && cpu_fan.is_none() {
+                                cpu_fan = Some(rpm);
+                            } else if !lower.contains("gpu") {
+                                case_fans.push(FanInfo {
+                                    name: s.name,
+                                    rpm,
+                                });
+                            }
+                        }
+                        return (cpu_fan, case_fans);
+                    }
+                }
+            }
+        }
+
+        (cpu_fan, case_fans)
+    }
+}
+
 // Embedded dashboard HTML
 const INDEX_HTML: &str = include_str!("../static/index.html");
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FanInfo {
+    pub name: String,
+    pub rpm: u32,
+}
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct DiskInfo {
@@ -324,6 +378,7 @@ pub struct SystemStatus {
     pub cpu_cores: usize,
     pub cpu_temp: Option<u32>,
     pub cpu_history: Vec<f32>, // 20 points (0..100)
+    pub cpu_fan: Option<u32>,
 
     // GPU
     pub gpu_usage: f32, // smoothed %
@@ -332,6 +387,7 @@ pub struct SystemStatus {
     pub vram_total_gb: f64,
     pub gpu_temp: u32,
     pub gpu_history: Vec<f32>, // 20 points (0..100)
+    pub gpu_fan: Option<u32>,
 
     // RAM
     pub mem_total_gb: f64,
@@ -347,6 +403,9 @@ pub struct SystemStatus {
 
     // All Non-removable Disks (sorted A-Z)
     pub disks: Vec<DiskInfo>,
+
+    // Case / System Fans (Multiple headers)
+    pub fans: Vec<FanInfo>,
 }
 
 /// Check if the connecting IP is a loopback or private LAN address
@@ -526,6 +585,8 @@ async fn main() {
             .build()
             .unwrap_or_default();
         let mut last_nas_stats: Option<NasStats> = None;
+        let mut last_cpu_fan: Option<u32> = None;
+        let mut last_case_fans: Vec<FanInfo> = Vec::new();
 
         let mut second_counter: u64 = 0;
 
@@ -569,6 +630,7 @@ async fn main() {
             let mut vram_used_gb = 0.0f64;
             let mut vram_total_gb = 0.0f64;
             let mut gpu_temp = 0u32;
+            let mut gpu_fan: Option<u32> = None;
             if let Some(ref n) = nvml {
                 if let Ok(dev) = n.device_by_index(0) {
                     if let Ok(util) = dev.utilization_rates() {
@@ -580,6 +642,9 @@ async fn main() {
                     }
                     if let Ok(temp) = dev.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu) {
                         gpu_temp = temp;
+                    }
+                    if let Ok(fan) = dev.fan_speed(0) {
+                        gpu_fan = Some(fan);
                     }
                 }
             }
@@ -638,6 +703,19 @@ async fn main() {
                 } else if let Some(ref mut st) = last_nas_stats {
                     st.online = false;
                 }
+
+                // Query Hardware Fan sensors via WMI (LibreHardwareMonitor / OpenHardwareMonitor)
+                #[cfg(windows)]
+                {
+                    if let Ok((c_fan, c_fans)) = tokio::task::spawn_blocking(win_fans::query_fans).await {
+                        if c_fan.is_some() {
+                            last_cpu_fan = c_fan;
+                        }
+                        if !c_fans.is_empty() {
+                            last_case_fans = c_fans;
+                        }
+                    }
+                }
             }
 
             // 5. Disks (all non-removable, sorted by name A-Z)
@@ -682,6 +760,7 @@ async fn main() {
                 lock.cpu_cores = cpu_cores;
                 lock.cpu_temp = cpu_temp;
                 lock.cpu_history = cpu_hist.iter().copied().collect();
+                lock.cpu_fan = last_cpu_fan;
 
                 lock.gpu_usage = gpu_avg;
                 lock.gpu_name = gpu_name.clone();
@@ -689,6 +768,7 @@ async fn main() {
                 lock.vram_total_gb = vram_total_gb;
                 lock.gpu_temp = gpu_temp;
                 lock.gpu_history = gpu_hist.iter().copied().collect();
+                lock.gpu_fan = gpu_fan;
 
                 lock.mem_total_gb = total_mem_gb;
                 lock.mem_used_gb = used_mem_gb;
@@ -702,6 +782,7 @@ async fn main() {
 
                 lock.disks = disk_list;
                 lock.nas = last_nas_stats.clone();
+                lock.fans = last_case_fans.clone();
             }
 
             tokio::time::sleep(Duration::from_secs(1)).await;
