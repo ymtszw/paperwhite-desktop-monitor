@@ -138,17 +138,36 @@ pub struct SystemStatus {
     pub server_instance: u64, // Unique timestamp for auto-reload detection
     pub hostname: String,
     pub os: String,
-    pub uptime_secs: u64,
-    pub uptime_str: String,
-    pub uptime_days: u64,
-    pub cpu_usage: f32, // 30s smoothed moving average
-    pub cpu_cores: usize,
-    pub mem_total_gb: f64,
-    pub mem_used_gb: f64,
-    pub mem_percent: f64, // 30s smoothed moving average
-    pub disks: Vec<DiskInfo>,
     pub server_ip: String,
     pub server_port: u16,
+
+    // CPU
+    pub cpu_usage: f32, // smoothed %
+    pub cpu_cores: usize,
+    pub cpu_history: Vec<f32>, // 20 points (0..100)
+
+    // GPU
+    pub gpu_usage: f32, // smoothed %
+    pub gpu_name: String,
+    pub vram_used_gb: f64,
+    pub vram_total_gb: f64,
+    pub gpu_temp: u32,
+    pub gpu_history: Vec<f32>, // 20 points (0..100)
+
+    // RAM
+    pub mem_total_gb: f64,
+    pub mem_used_gb: f64,
+    pub mem_percent: f64, // smoothed %
+    pub mem_history: Vec<f64>, // 20 points (0..100)
+
+    // Network
+    pub net_in_kb: f64,  // smoothed KB/s
+    pub net_out_kb: f64, // smoothed KB/s
+    pub net_in_history: Vec<f64>,
+    pub net_out_history: Vec<f64>,
+
+    // All Non-removable Disks (sorted A-Z)
+    pub disks: Vec<DiskInfo>,
 }
 
 /// Check if the connecting IP is a loopback or private LAN address
@@ -170,16 +189,6 @@ fn is_local_or_lan(ip: IpAddr) -> bool {
     }
 }
 
-/// Format seconds into readable days/hours
-fn format_uptime(secs: u64) -> (String, u64) {
-    let days = secs / 86400;
-    let hours = (secs % 86400) / 3600;
-    if days > 0 {
-        (format!("{}日 {}時間", days, hours), days)
-    } else {
-        (format!("{}時間", hours), 0)
-    }
-}
 
 /// Middleware to enforce Local / Private LAN access only
 async fn lan_access_middleware(
@@ -292,6 +301,9 @@ async fn main() {
     tokio::spawn(async move {
         let mut sys = System::new_all();
         let mut disks = Disks::new_with_refreshed_list();
+        let mut networks = sysinfo::Networks::new_with_refreshed_list();
+        let nvml = nvml_wrapper::Nvml::init().ok();
+
         let hostname = System::host_name().unwrap_or_else(|| "PC".to_string());
         let os_str = format!(
             "{} {}",
@@ -303,22 +315,44 @@ async fn main() {
 
         let cpu_cores = sys.cpus().len();
 
-        const WINDOW_SIZE: usize = 30;
-        let mut cpu_history: VecDeque<f32> = VecDeque::with_capacity(WINDOW_SIZE);
-        let mut mem_history: VecDeque<f64> = VecDeque::with_capacity(WINDOW_SIZE);
+        let gpu_name = if let Some(ref n) = nvml {
+            n.device_by_index(0)
+                .and_then(|d| d.name())
+                .unwrap_or_else(|_| "NVIDIA GPU".to_string())
+        } else {
+            "GPU".to_string()
+        };
+
+        const SMOOTH_WINDOW: usize = 15;
+        const HIST_LEN: usize = 20;
+
+        let mut cpu_smooth: VecDeque<f32> = VecDeque::with_capacity(SMOOTH_WINDOW);
+        let mut mem_smooth: VecDeque<f64> = VecDeque::with_capacity(SMOOTH_WINDOW);
+        let mut gpu_smooth: VecDeque<f32> = VecDeque::with_capacity(SMOOTH_WINDOW);
+        let mut net_in_smooth: VecDeque<f64> = VecDeque::with_capacity(SMOOTH_WINDOW);
+        let mut net_out_smooth: VecDeque<f64> = VecDeque::with_capacity(SMOOTH_WINDOW);
+
+        let mut cpu_hist: VecDeque<f32> = VecDeque::from(vec![0.0; HIST_LEN]);
+        let mut mem_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
+        let mut gpu_hist: VecDeque<f32> = VecDeque::from(vec![0.0; HIST_LEN]);
+        let mut net_in_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
+        let mut net_out_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
+
+        let mut second_counter: u64 = 0;
 
         loop {
             sys.refresh_cpu_usage();
             sys.refresh_memory();
             disks.refresh(true);
+            networks.refresh(true);
 
+            // 1. CPU
             let instant_cpu = sys.global_cpu_usage();
-            cpu_history.push_back(instant_cpu);
-            if cpu_history.len() > WINDOW_SIZE {
-                cpu_history.pop_front();
-            }
-            let cpu_avg = cpu_history.iter().sum::<f32>() / cpu_history.len() as f32;
+            cpu_smooth.push_back(instant_cpu);
+            if cpu_smooth.len() > SMOOTH_WINDOW { cpu_smooth.pop_front(); }
+            let cpu_avg = cpu_smooth.iter().sum::<f32>() / cpu_smooth.len() as f32;
 
+            // 2. RAM
             let total_mem_bytes = sys.total_memory();
             let used_mem_bytes = sys.used_memory();
             let total_mem_gb = total_mem_bytes as f64 / 1_073_741_824.0;
@@ -328,19 +362,77 @@ async fn main() {
             } else {
                 0.0
             };
+            mem_smooth.push_back(instant_mem_pct);
+            if mem_smooth.len() > SMOOTH_WINDOW { mem_smooth.pop_front(); }
+            let mem_avg = mem_smooth.iter().sum::<f64>() / mem_smooth.len() as f64;
 
-            mem_history.push_back(instant_mem_pct);
-            if mem_history.len() > WINDOW_SIZE {
-                mem_history.pop_front();
+            // 3. GPU
+            let mut instant_gpu = 0.0f32;
+            let mut vram_used_gb = 0.0f64;
+            let mut vram_total_gb = 0.0f64;
+            let mut gpu_temp = 0u32;
+            if let Some(ref n) = nvml {
+                if let Ok(dev) = n.device_by_index(0) {
+                    if let Ok(util) = dev.utilization_rates() {
+                        instant_gpu = util.gpu as f32;
+                    }
+                    if let Ok(mem) = dev.memory_info() {
+                        vram_used_gb = mem.used as f64 / 1_073_741_824.0;
+                        vram_total_gb = mem.total as f64 / 1_073_741_824.0;
+                    }
+                    if let Ok(temp) = dev.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu) {
+                        gpu_temp = temp;
+                    }
+                }
             }
-            let mem_avg = mem_history.iter().sum::<f64>() / mem_history.len() as f64;
+            gpu_smooth.push_back(instant_gpu);
+            if gpu_smooth.len() > SMOOTH_WINDOW { gpu_smooth.pop_front(); }
+            let gpu_avg = gpu_smooth.iter().sum::<f32>() / gpu_smooth.len() as f32;
 
-            let uptime_secs = System::uptime();
-            let (uptime_str, uptime_days) = format_uptime(uptime_secs);
+            // 4. Network
+            let mut total_rx_bytes = 0u64;
+            let mut total_tx_bytes = 0u64;
+            for (iface, data) in &networks {
+                if !iface.to_lowercase().contains("loopback") {
+                    total_rx_bytes += data.received();
+                    total_tx_bytes += data.transmitted();
+                }
+            }
+            let instant_rx_kb = total_rx_bytes as f64 / 1024.0;
+            let instant_tx_kb = total_tx_bytes as f64 / 1024.0;
+            net_in_smooth.push_back(instant_rx_kb);
+            if net_in_smooth.len() > SMOOTH_WINDOW { net_in_smooth.pop_front(); }
+            let net_in_avg = net_in_smooth.iter().sum::<f64>() / net_in_smooth.len() as f64;
 
-            // Collect Disks
+            net_out_smooth.push_back(instant_tx_kb);
+            if net_out_smooth.len() > SMOOTH_WINDOW { net_out_smooth.pop_front(); }
+            let net_out_avg = net_out_smooth.iter().sum::<f64>() / net_out_smooth.len() as f64;
+
+            // History sampling every 2 seconds
+            second_counter += 1;
+            if second_counter % 2 == 0 {
+                cpu_hist.push_back(cpu_avg);
+                if cpu_hist.len() > HIST_LEN { cpu_hist.pop_front(); }
+
+                mem_hist.push_back(mem_avg);
+                if mem_hist.len() > HIST_LEN { mem_hist.pop_front(); }
+
+                gpu_hist.push_back(gpu_avg);
+                if gpu_hist.len() > HIST_LEN { gpu_hist.pop_front(); }
+
+                net_in_hist.push_back(net_in_avg);
+                if net_in_hist.len() > HIST_LEN { net_in_hist.pop_front(); }
+
+                net_out_hist.push_back(net_out_avg);
+                if net_out_hist.len() > HIST_LEN { net_out_hist.pop_front(); }
+            }
+
+            // 5. Disks (all non-removable, sorted by name A-Z)
             let mut disk_list = Vec::new();
             for disk in disks.list() {
+                if disk.is_removable() {
+                    continue;
+                }
                 let total = disk.total_space();
                 if total == 0 {
                     continue;
@@ -361,6 +453,7 @@ async fn main() {
                     usage_percent: usage_pct,
                 });
             }
+            disk_list.sort_by(|a, b| a.name.to_uppercase().cmp(&b.name.to_uppercase()));
 
             // Write into shared state
             {
@@ -368,17 +461,31 @@ async fn main() {
                 lock.server_instance = instance_id;
                 lock.hostname = hostname.clone();
                 lock.os = os_str.clone();
-                lock.uptime_secs = uptime_secs;
-                lock.uptime_str = uptime_str;
-                lock.uptime_days = uptime_days;
+                lock.server_ip = local_ip_clone.clone();
+                lock.server_port = port;
+
                 lock.cpu_usage = cpu_avg;
                 lock.cpu_cores = cpu_cores;
+                lock.cpu_history = cpu_hist.iter().copied().collect();
+
+                lock.gpu_usage = gpu_avg;
+                lock.gpu_name = gpu_name.clone();
+                lock.vram_used_gb = vram_used_gb;
+                lock.vram_total_gb = vram_total_gb;
+                lock.gpu_temp = gpu_temp;
+                lock.gpu_history = gpu_hist.iter().copied().collect();
+
                 lock.mem_total_gb = total_mem_gb;
                 lock.mem_used_gb = used_mem_gb;
                 lock.mem_percent = mem_avg;
+                lock.mem_history = mem_hist.iter().copied().collect();
+
+                lock.net_in_kb = net_in_avg;
+                lock.net_out_kb = net_out_avg;
+                lock.net_in_history = net_in_hist.iter().copied().collect();
+                lock.net_out_history = net_out_hist.iter().copied().collect();
+
                 lock.disks = disk_list;
-                lock.server_ip = local_ip_clone.clone();
-                lock.server_port = port;
             }
 
             tokio::time::sleep(Duration::from_secs(1)).await;

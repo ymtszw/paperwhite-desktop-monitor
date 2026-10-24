@@ -6,7 +6,7 @@
   <title>Kindle Desktop Monitor</title>
   <style>
     /* ========================================================
-       E-ink Minimalist 3x3 Dashboard (Legacy WebKit Strict)
+       E-ink Minimalist 3x2 Bold Dashboard (Legacy WebKit Strict)
        ======================================================== */
     * {
       -webkit-box-sizing: border-box;
@@ -69,32 +69,32 @@
       box-sizing: border-box;
     }
 
-    /* Robust Table Layout for Legacy WebKit: 3 Columns x 3 Rows */
+    /* 3 Columns x 2 Rows Bold Table Layout */
     #tiles-table {
       width: 100%;
       height: 100%;
       table-layout: fixed;
       border-collapse: separate;
-      border-spacing: 5px;
-      padding: 2px;
+      border-spacing: 8px;
+      padding: 4px;
       box-sizing: border-box;
     }
 
     .tile-cell {
       width: 33.333%;
-      height: 33.333%;
+      height: 50%;
       padding: 0;
       margin: 0;
       vertical-align: top;
     }
 
-    /* Graphical Tile Box */
+    /* Graphical Bold Tile Box */
     .tile-box {
       width: 100%;
       height: 100%;
-      border: 3px solid #000000;
+      border: 4px solid #000000;
       background-color: #ffffff;
-      padding: 4px 7px;
+      padding: 10px 14px;
       box-sizing: border-box;
       display: -webkit-box;
       display: flex;
@@ -106,75 +106,143 @@
       overflow: hidden;
     }
 
+    /* Tile Header */
     .tile-top {
-      display: -webkit-box;
-      display: flex;
-      -webkit-box-pack: justify;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      align-items: center;
-      border-bottom: 2px solid #000000;
-      padding-bottom: 2px;
+      display: table;
+      width: 100%;
+      border-bottom: 3px solid #000000;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
     }
 
     .tile-title {
-      font-size: 0.95rem;
+      display: table-cell;
+      font-size: 1.45rem;
       font-weight: 900;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
+      vertical-align: middle;
+      text-align: left;
     }
 
-    .tile-sub {
-      font-size: 0.75rem;
+    .tile-tag {
+      display: table-cell;
+      font-size: 1.05rem;
       font-weight: 800;
-      color: #333333;
+      vertical-align: middle;
+      text-align: right;
     }
 
-    /* Center Number */
+    .tile-badge {
+      display: inline-block;
+      border: 2px solid #000000;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-weight: 900;
+    }
+
+    /* Large Center Metric */
     .tile-mid {
+      margin: 4px 0;
       display: -webkit-box;
       display: flex;
       -webkit-box-align: baseline;
       align-items: baseline;
-      margin: 1px 0;
+      -webkit-box-pack: justify;
+      justify-content: space-between;
+    }
+
+    .tile-num-wrap {
+      display: inline-block;
+      line-height: 1;
     }
 
     .tile-num {
-      font-size: 2.2rem;
+      font-size: 4.2rem;
       font-weight: 900;
       line-height: 1;
       font-family: "Courier New", Courier, monospace, sans-serif;
     }
 
     .tile-pct {
-      font-size: 1.15rem;
+      font-size: 2.2rem;
       font-weight: 900;
       margin-left: 2px;
     }
 
-    /* Graphical Segmented Gauge (10 blocks) */
-    .seg-gauge {
-      width: 100%;
-      height: 10px;
-      display: -webkit-box;
-      display: flex;
-      gap: 2px;
-      margin: 1px 0;
+    .tile-sub-stat {
+      font-size: 1.15rem;
+      font-weight: 800;
+      text-align: right;
+      line-height: 1.3;
     }
 
-    .seg {
-      -webkit-box-flex: 1;
-      flex: 1;
+    /* Graphical History Sparkline Chart (20 vertical columns) */
+    .hist-container {
+      width: 100%;
+      height: 140px;
+      border-top: 3px solid #000000;
+      padding-top: 8px;
+      box-sizing: border-box;
+      display: table;
+      table-layout: fixed;
+    }
+
+    .hist-col {
+      display: table-cell;
       height: 100%;
-      border: 1px solid #000000;
+      vertical-align: bottom;
+      padding: 0 2px;
+      box-sizing: border-box;
+    }
+
+    .hist-bar {
+      width: 100%;
+      background-color: #000000;
+      min-height: 3px;
+      height: 3px;
+    }
+
+    /* Multi-Disk Storage Rows */
+    .disk-row {
+      margin-bottom: 8px;
+    }
+
+    .disk-header {
+      display: table;
+      width: 100%;
+      margin-bottom: 3px;
+    }
+
+    .disk-name {
+      display: table-cell;
+      font-size: 1.3rem;
+      font-weight: 900;
+      font-family: monospace;
+      text-align: left;
+    }
+
+    .disk-meta {
+      display: table-cell;
+      font-size: 1.1rem;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .disk-track {
+      width: 100%;
+      height: 20px;
+      border: 3px solid #000000;
       background-color: #ffffff;
       box-sizing: border-box;
     }
 
-    .seg.on {
+    .disk-fill {
+      height: 100%;
       background-color: #000000;
     }
 
-    /* Action Tile for Rotation */
+    /* Action Tile for Rotation & Status */
     .tile-action {
       cursor: pointer;
       text-align: center;
@@ -182,7 +250,6 @@
       align-items: center;
       -webkit-box-pack: center;
       justify-content: center;
-      gap: 2px;
     }
 
     .tile-action:active {
@@ -190,27 +257,45 @@
       color: #ffffff;
     }
 
+    .tile-action:active .tile-action-icon,
+    .tile-action:active .tile-action-label,
+    .tile-action:active .tile-action-sub,
+    .tile-action:active .adj-btn {
+      color: #ffffff;
+      border-color: #ffffff;
+    }
+
     .tile-action-icon {
-      font-size: 2.1rem;
+      font-size: 4.5rem;
       font-weight: 900;
       line-height: 1;
+      margin: 8px 0;
     }
 
-    .tile-action-text {
-      font-size: 1rem;
+    .tile-action-label {
+      font-size: 1.6rem;
       font-weight: 900;
+      letter-spacing: 1px;
     }
 
-    /* Width Adjuster Buttons */
+    .tile-action-sub {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-top: 6px;
+    }
+
+    /* Utility Button */
     .adj-btn {
       background: #ffffff;
       color: #000000;
       border: 2px solid #000000;
       font-weight: 900;
-      font-size: 0.8rem;
-      padding: 3px 6px;
+      font-size: 0.9rem;
+      padding: 3px 8px;
       border-radius: 3px;
       cursor: pointer;
+      display: inline-block;
+      margin-top: 8px;
     }
 
     .adj-btn:active {
@@ -237,44 +322,48 @@
     }
 
     .sleep-icon {
-      font-size: 3.2rem;
+      font-size: 3.5rem;
       line-height: 1;
       font-weight: 900;
       margin-bottom: 6px;
     }
 
     .sleep-box {
-      border: 4px solid #000000;
-      padding: 16px 20px;
-      max-width: 440px;
-      margin: 40px auto 0 auto;
+      border: 5px solid #000000;
+      padding: 24px 28px;
+      max-width: 500px;
+      margin: 60px auto 0 auto;
       background-color: #ffffff;
       text-align: center;
     }
 
     .sleep-title {
-      font-size: 1.7rem;
+      font-size: 2.2rem;
       font-weight: 900;
       letter-spacing: 2px;
+      margin-bottom: 4px;
     }
 
     .sleep-sub {
-      font-size: 0.9rem;
-      font-weight: 700;
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 12px;
     }
 
     .sleep-details {
-      border-top: 2px dashed #000000;
-      border-bottom: 2px dashed #000000;
-      padding: 5px 0;
-      font-size: 0.82rem;
+      border-top: 3px dashed #000000;
+      border-bottom: 3px dashed #000000;
+      padding: 10px 0;
+      font-size: 1.1rem;
       text-align: left;
+      line-height: 1.6;
     }
 
     .sleep-counter {
       font-family: monospace;
-      font-size: 0.82rem;
+      font-size: 1.05rem;
       font-weight: bold;
+      margin-top: 12px;
     }
 
     .flash-invert {
@@ -299,7 +388,7 @@
           <div class="sleep-details">
             <div>最終通信: <strong id="sleep-last-seen">--:--:--</strong></div>
             <div>スリープ経過: <strong id="sleep-elapsed">0秒</strong></div>
-            <div>端末時刻: <strong id="sleep-local-clock">--:--:--</strong></div>
+            <div>端末時計: <strong id="sleep-local-clock">--:--:--</strong></div>
           </div>
           <div class="sleep-counter" id="sleep-status-text">
             再接続待機中... (試行 #<span id="sleep-retry-count">0</span>)
@@ -307,54 +396,71 @@
         </div>
       </div>
 
-      <!-- 3-Column x 3-Row Robust Table -->
-      <table id="tiles-table" cellpadding="0" cellspacing="5">
+      <!-- 3-Column x 2-Row Bold Dashboard Table -->
+      <table id="tiles-table" cellpadding="0" cellspacing="8">
         <!-- Row 1 -->
         <tr>
+          <!-- Cell 0: CPU -->
           <td class="tile-cell" id="cell-0">
             <div class="tile-box" id="tile-cpu">
               <div class="tile-top">
                 <span class="tile-title">CPU</span>
-                <span class="tile-sub" id="val-cpu-cores">--C</span>
+                <span class="tile-tag"><span class="tile-badge" id="val-cpu-cores">--C</span></span>
               </div>
               <div class="tile-mid">
-                <span class="tile-num" id="val-cpu-num">0</span><span class="tile-pct">%</span>
+                <div class="tile-num-wrap">
+                  <span class="tile-num" id="val-cpu-num">0</span><span class="tile-pct">%</span>
+                </div>
+                <div class="tile-sub-stat">
+                  LOAD
+                </div>
               </div>
-              <div class="seg-gauge" id="gauge-cpu">
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              <div class="hist-container" id="hist-cpu">
+                <!-- 20 columns generated by JS -->
               </div>
             </div>
           </td>
 
+          <!-- Cell 1: GPU -->
           <td class="tile-cell" id="cell-1">
+            <div class="tile-box" id="tile-gpu">
+              <div class="tile-top">
+                <span class="tile-title">GPU</span>
+                <span class="tile-tag"><span class="tile-badge" id="val-gpu-badge">GPU</span></span>
+              </div>
+              <div class="tile-mid">
+                <div class="tile-num-wrap">
+                  <span class="tile-num" id="val-gpu-num">0</span><span class="tile-pct">%</span>
+                </div>
+                <div class="tile-sub-stat">
+                  <div><strong id="val-gpu-vram">0</strong>G VRAM</div>
+                  <div id="val-gpu-temp">--°C</div>
+                </div>
+              </div>
+              <div class="hist-container" id="hist-gpu">
+                <!-- 20 columns generated by JS -->
+              </div>
+            </div>
+          </td>
+
+          <!-- Cell 2: RAM -->
+          <td class="tile-cell" id="cell-2">
             <div class="tile-box" id="tile-mem">
               <div class="tile-top">
                 <span class="tile-title">RAM</span>
-                <span class="tile-sub"><span id="val-mem-used">0</span>/<span id="val-mem-total">0</span>G</span>
+                <span class="tile-tag"><span class="tile-badge" id="val-mem-total-badge">--G</span></span>
               </div>
               <div class="tile-mid">
-                <span class="tile-num" id="val-mem-num">0</span><span class="tile-pct">%</span>
+                <div class="tile-num-wrap">
+                  <span class="tile-num" id="val-mem-num">0</span><span class="tile-pct">%</span>
+                </div>
+                <div class="tile-sub-stat">
+                  <div>USED: <strong id="val-mem-used">0</strong>G</div>
+                  <div>FREE: <strong id="val-mem-free">0</strong>G</div>
+                </div>
               </div>
-              <div class="seg-gauge" id="gauge-mem">
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-              </div>
-            </div>
-          </td>
-
-          <td class="tile-cell" id="cell-2">
-            <div class="tile-box" id="tile-disk-c">
-              <div class="tile-top">
-                <span class="tile-title">C: (OS)</span>
-                <span class="tile-sub" id="val-disk-c-free">--G 空き</span>
-              </div>
-              <div class="tile-mid">
-                <span class="tile-num" id="val-disk-c-num">0</span><span class="tile-pct">%</span>
-              </div>
-              <div class="seg-gauge" id="gauge-disk-c">
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              <div class="hist-container" id="hist-mem">
+                <!-- 20 columns generated by JS -->
               </div>
             </div>
           </td>
@@ -362,96 +468,58 @@
 
         <!-- Row 2 -->
         <tr>
+          <!-- Cell 3: NETWORK -->
           <td class="tile-cell" id="cell-3">
-            <div class="tile-box" id="tile-disk-d">
+            <div class="tile-box" id="tile-net">
               <div class="tile-top">
-                <span class="tile-title">D: (SSD)</span>
-                <span class="tile-sub" id="val-disk-d-free">--G 空き</span>
+                <span class="tile-title">NETWORK</span>
+                <span class="tile-tag"><span class="tile-badge">LAN</span></span>
               </div>
-              <div class="tile-mid">
-                <span class="tile-num" id="val-disk-d-num">0</span><span class="tile-pct">%</span>
+              <div class="tile-mid" style="margin: 6px 0;">
+                <div style="width: 100%;">
+                  <div style="font-size: 1.85rem; font-weight: 900; margin-bottom: 4px;">
+                    ↓ <span id="val-net-in">0.0</span> <span style="font-size: 1.1rem;" id="val-net-in-unit">KB/s</span>
+                  </div>
+                  <div style="font-size: 1.85rem; font-weight: 900;">
+                    ↑ <span id="val-net-out">0.0</span> <span style="font-size: 1.1rem;" id="val-net-out-unit">KB/s</span>
+                  </div>
+                </div>
               </div>
-              <div class="seg-gauge" id="gauge-disk-d">
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              <div class="hist-container" id="hist-net">
+                <!-- 20 columns generated by JS -->
               </div>
             </div>
           </td>
 
+          <!-- Cell 4: DISKS (All Non-Removable Drives) -->
           <td class="tile-cell" id="cell-4">
-            <div class="tile-box" id="tile-disk-e">
+            <div class="tile-box" id="tile-disks">
               <div class="tile-top">
-                <span class="tile-title">E: (SSD)</span>
-                <span class="tile-sub" id="val-disk-e-free">--G 空き</span>
+                <span class="tile-title">STORAGE</span>
+                <span class="tile-tag"><span class="tile-badge" id="val-disk-count">DRIVES</span></span>
               </div>
-              <div class="tile-mid">
-                <span class="tile-num" id="val-disk-e-num">0</span><span class="tile-pct">%</span>
-              </div>
-              <div class="seg-gauge" id="gauge-disk-e">
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+              <div id="disks-container" style="overflow: hidden; padding-top: 4px;">
+                <!-- Drive rows generated dynamically by JS -->
               </div>
             </div>
           </td>
 
+          <!-- Cell 5: ROTATE / SYSTEM STATUS -->
           <td class="tile-cell" id="cell-5">
-            <div class="tile-box" id="tile-disk-f">
-              <div class="tile-top">
-                <span class="tile-title">F: (SSD)</span>
-                <span class="tile-sub" id="val-disk-f-free">--G 空き</span>
-              </div>
-              <div class="tile-mid">
-                <span class="tile-num" id="val-disk-f-num">0</span><span class="tile-pct">%</span>
-              </div>
-              <div class="seg-gauge" id="gauge-disk-f">
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-                <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
-              </div>
-            </div>
-          </td>
-        </tr>
-
-        <!-- Row 3 -->
-        <tr>
-          <td class="tile-cell" id="cell-6">
-            <div class="tile-box" id="tile-system">
-              <div class="tile-top">
-                <span class="tile-title">UPTIME</span>
-                <span class="tile-sub">稼働</span>
-              </div>
-              <div class="tile-mid">
-                <span class="tile-num" id="val-uptime-num">--</span>
-              </div>
-              <div class="seg-gauge" id="gauge-uptime">
-                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
-                <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
-              </div>
-            </div>
-          </td>
-
-          <td class="tile-cell" id="cell-7">
-            <!-- Interactive Tile: Width Tuning & Real-time Diagnostics -->
-            <div class="tile-box" id="tile-host">
-              <div class="tile-top">
-                <span class="tile-title">STATUS</span>
-                <span class="tile-sub" id="diag-dims">--</span>
-              </div>
-              <div class="tile-mid" style="justify-content: space-between; width: 100%;">
-                <button class="adj-btn" onclick="adjustOffset(10); event.stopPropagation();">◀ 短縮</button>
-                <span class="tile-num" style="font-size: 1.15rem;" id="val-cur-w">--</span>
-                <button class="adj-btn" onclick="adjustOffset(-10); event.stopPropagation();">伸長 ▶</button>
-              </div>
-              <div class="tile-top" style="border-top: 1px dashed #000; border-bottom: none; padding-top: 2px;">
-                <span class="tile-sub" id="diag-scroll-stats">T:0 L:0</span>
-                <button class="adj-btn" style="font-size:0.7rem; padding:1px 5px;" onclick="testSleepMode(); event.stopPropagation();">☾ テスト</button>
-              </div>
-            </div>
-          </td>
-
-          <td class="tile-cell" id="cell-8">
             <div class="tile-box tile-action" id="tile-rotate" onclick="cycleRotation()">
-              <div class="tile-action-icon">⟳</div>
-              <div class="tile-action-text" id="val-rot-label">90°</div>
+              <div class="tile-top">
+                <span class="tile-title">SYSTEM</span>
+                <span class="tile-tag"><span class="tile-badge">● ONLINE</span></span>
+              </div>
+              <div style="text-align: center; margin: 4px 0;">
+                <div class="tile-action-icon">⟳</div>
+                <div class="tile-action-label" id="val-rot-label">90° 画面回転</div>
+                <div class="tile-action-sub" id="val-hostname">PC</div>
+                <div class="tile-action-sub" style="font-family: monospace; font-size: 0.95rem;" id="val-ip">--</div>
+              </div>
+              <div style="border-top: 3px solid #000; padding-top: 6px; text-align: center;">
+                <button class="adj-btn" onclick="testSleepMode(); event.stopPropagation();">☾ 休止テスト</button>
+              </div>
             </div>
           </td>
         </tr>
@@ -470,17 +538,8 @@
     var pollIntervalMs = 8000;
     var currentRotation = '90';
 
-    // Width offset deduction from height: default 42 gives 1268 - 42 = 1226px
+    // Width offset deduction from height: 1268 - 42 = 1226px (optimal view)
     var customWidthOffset = 42;
-    try {
-      var savedOffset = localStorage.getItem('kindle_width_offset');
-      if (savedOffset !== null) {
-        var parsed = parseInt(savedOffset, 10);
-        if (!isNaN(parsed) && parsed < 100) {
-          customWidthOffset = parsed;
-        }
-      }
-    } catch(e) {}
 
     // Auto-Reload mechanism: server instance ID
     var serverInstanceId = null;
@@ -507,41 +566,53 @@
       return hours + '時間 ' + remMin + '分';
     }
 
-    function setGauge(gaugeId, percent) {
-      var gauge = document.getElementById(gaugeId);
-      if (!gauge) return;
-      var activeCount = Math.round((percent / 100) * 10);
-      if (activeCount < 0) activeCount = 0;
-      if (activeCount > 10) activeCount = 10;
-      var segs = gauge.getElementsByClassName('seg');
-      for (var i = 0; i < segs.length; i++) {
-        if (i < activeCount) {
-          segs[i].className = 'seg on';
-        } else {
-          segs[i].className = 'seg';
+    // Build 20 columns for history containers
+    function initHistoryBars(containerId) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+      var html = '';
+      for (var i = 0; i < 20; i++) {
+        html += '<div class="hist-col"><div class="hist-bar"></div></div>';
+      }
+      container.innerHTML = html;
+    }
+
+    initHistoryBars('hist-cpu');
+    initHistoryBars('hist-gpu');
+    initHistoryBars('hist-mem');
+    initHistoryBars('hist-net');
+
+    function updateHistoryChart(containerId, dataArray, maxVal) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+      var bars = container.getElementsByClassName('hist-bar');
+      if (!bars || bars.length === 0) return;
+
+      var max = maxVal;
+      if (!max || max <= 0) {
+        max = 1;
+        if (dataArray && dataArray.length > 0) {
+          for (var k = 0; k < dataArray.length; k++) {
+            if (dataArray[k] > max) max = dataArray[k];
+          }
         }
+      }
+
+      var len = bars.length;
+      var dataLen = dataArray ? dataArray.length : 0;
+      for (var i = 0; i < len; i++) {
+        var dataIdx = dataLen - len + i;
+        var val = (dataIdx >= 0 && dataIdx < dataLen) ? dataArray[dataIdx] : 0;
+        var pct = Math.min(100, Math.max(3, Math.round((val / max) * 100)));
+        bars[i].style.height = pct + '%';
       }
     }
 
-    function findDisk(disks, letter) {
-      if (!disks) return null;
-      for (var i = 0; i < disks.length; i++) {
-        var name = (disks[i].name || '').toUpperCase();
-        if (name.indexOf(letter + ':') === 0) {
-          return disks[i];
-        }
+    function formatSpeed(kb) {
+      if (kb >= 1024) {
+        return { val: (kb / 1024).toFixed(1), unit: 'MB/s' };
       }
-      return null;
-    }
-
-    function updateDiskTile(disk, numId, freeId, gaugeId) {
-      if (!disk) return;
-      var pct = Math.round(disk.usage_percent || 0);
-      var numEl = document.getElementById(numId);
-      var freeEl = document.getElementById(freeId);
-      if (numEl) numEl.innerText = pct;
-      if (freeEl) freeEl.innerText = Math.round(disk.free_gb) + 'G 空き';
-      setGauge(gaugeId, pct);
+      return { val: Math.round(kb), unit: 'KB/s' };
     }
 
     function renderStatus(data) {
@@ -549,25 +620,74 @@
       var cpuPct = Math.round(data.cpu_usage || 0);
       document.getElementById('val-cpu-num').innerText = cpuPct;
       document.getElementById('val-cpu-cores').innerText = (data.cpu_cores || 0) + 'C';
-      setGauge('gauge-cpu', cpuPct);
+      updateHistoryChart('hist-cpu', data.cpu_history, 100);
 
-      // 2. RAM
+      // 2. GPU
+      var gpuPct = Math.round(data.gpu_usage || 0);
+      document.getElementById('val-gpu-num').innerText = gpuPct;
+      document.getElementById('val-gpu-vram').innerText = (data.vram_used_gb || 0).toFixed(1);
+      document.getElementById('val-gpu-temp').innerText = (data.gpu_temp ? data.gpu_temp + '°C' : '');
+      var gpuShort = (data.gpu_name || 'GPU').replace('NVIDIA GeForce ', '').replace('NVIDIA ', '');
+      document.getElementById('val-gpu-badge').innerText = gpuShort;
+      updateHistoryChart('hist-gpu', data.gpu_history, 100);
+
+      // 3. RAM
       var memPct = Math.round(data.mem_percent || 0);
       document.getElementById('val-mem-num').innerText = memPct;
       document.getElementById('val-mem-used').innerText = Math.round(data.mem_used_gb || 0);
-      document.getElementById('val-mem-total').innerText = Math.round(data.mem_total_gb || 0);
-      setGauge('gauge-mem', memPct);
+      var totalMem = Math.round(data.mem_total_gb || 0);
+      var freeMem = Math.max(0, totalMem - Math.round(data.mem_used_gb || 0));
+      document.getElementById('val-mem-free').innerText = freeMem;
+      document.getElementById('val-mem-total-badge').innerText = totalMem + 'G';
+      updateHistoryChart('hist-mem', data.mem_history, 100);
 
-      // 3. Disks: C, D, E, F
+      // 4. Network
+      var inSpeed = formatSpeed(data.net_in_kb || 0);
+      var outSpeed = formatSpeed(data.net_out_kb || 0);
+      document.getElementById('val-net-in').innerText = inSpeed.val;
+      document.getElementById('val-net-in-unit').innerText = inSpeed.unit;
+      document.getElementById('val-net-out').innerText = outSpeed.val;
+      document.getElementById('val-net-out-unit').innerText = outSpeed.unit;
+
+      // Combine in/out history for chart
+      var netHistory = [];
+      if (data.net_in_history && data.net_out_history) {
+        var nLen = Math.max(data.net_in_history.length, data.net_out_history.length);
+        for (var ni = 0; ni < nLen; ni++) {
+          var rx = data.net_in_history[ni] || 0;
+          var tx = data.net_out_history[ni] || 0;
+          netHistory.push(rx + tx);
+        }
+      }
+      updateHistoryChart('hist-net', netHistory, 0);
+
+      // 5. Disks (All Non-Removable Drives)
       if (data.disks && data.disks.length > 0) {
-        updateDiskTile(findDisk(data.disks, 'C'), 'val-disk-c-num', 'val-disk-c-free', 'gauge-disk-c');
-        updateDiskTile(findDisk(data.disks, 'D'), 'val-disk-d-num', 'val-disk-d-free', 'gauge-disk-d');
-        updateDiskTile(findDisk(data.disks, 'E'), 'val-disk-e-num', 'val-disk-e-free', 'gauge-disk-e');
-        updateDiskTile(findDisk(data.disks, 'F'), 'val-disk-f-num', 'val-disk-f-free', 'gauge-disk-f');
+        document.getElementById('val-disk-count').innerText = data.disks.length + ' DRIVES';
+        var dHtml = '';
+        for (var di = 0; di < data.disks.length; di++) {
+          var d = data.disks[di];
+          var pct = Math.round(d.usage_percent || 0);
+          var freeGb = Math.round(d.free_gb || 0);
+          var dLetter = d.name.replace(/\\/g, '');
+          dHtml += '<div class="disk-row">'
+            + '<div class="disk-header">'
+            + '  <span class="disk-name">' + dLetter + '</span>'
+            + '  <span class="disk-meta"><strong>' + pct + '%</strong> (' + freeGb + 'G 空き)</span>'
+            + '</div>'
+            + '<div class="disk-track">'
+            + '  <div class="disk-fill" style="width: ' + pct + '%;"></div>'
+            + '</div>'
+            + '</div>';
+        }
+        document.getElementById('disks-container').innerHTML = dHtml;
       }
 
-      // 4. System & Host
-      document.getElementById('val-uptime-num').innerText = data.uptime_days ? (data.uptime_days + '日') : (data.uptime_str || '--');
+      // 6. System / Host
+      document.getElementById('val-hostname').innerText = data.hostname || 'PC';
+      if (data.server_ip && data.server_port) {
+        document.getElementById('val-ip').innerText = data.server_ip + ':' + data.server_port;
+      }
     }
 
     function enterSleepMode() {
@@ -718,7 +838,7 @@
 
     function shuffleTiles() {
       var cells = [];
-      for (var i = 0; i < 9; i++) {
+      for (var i = 0; i < 6; i++) {
         var cell = document.getElementById('cell-' + i);
         if (cell && cell.firstElementChild) {
           cells.push(cell.firstElementChild);
@@ -732,7 +852,7 @@
         cells[k] = temp;
       }
 
-      for (var m = 0; m < 9; m++) {
+      for (var m = 0; m < 6; m++) {
         var targetCell = document.getElementById('cell-' + m);
         if (targetCell && cells[m]) {
           targetCell.appendChild(cells[m]);
@@ -742,21 +862,9 @@
       clearGhosting();
     }
 
-    /* Adjust offset (+10px shortens height, -10px lengthens) */
-    function adjustOffset(delta) {
-      customWidthOffset += delta;
-      if (customWidthOffset < 0) customWidthOffset = 0;
-      try {
-        localStorage.setItem('kindle_width_offset', customWidthOffset);
-      } catch(e) {}
-      applyRotation();
-      clearGhosting();
-    }
-
     function getViewportDimensions() {
       var w = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 0) || 1072;
       var h = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 1260;
-      // If h is reported as raw screen height (>=1400px), deduct Kindle browser chrome (~188px)
       if (h >= 1400) {
         h = 1260;
       }
@@ -788,12 +896,6 @@
       var safeLandscapeW = Math.max(100, h - customWidthOffset);
       var safeLandscapeH = Math.max(100, w - 8);
 
-      var curWEl = document.getElementById('val-cur-w');
-      if (curWEl) curWEl.innerText = safeLandscapeW + 'px';
-
-      var diagEl = document.getElementById('diag-dims');
-      if (diagEl) diagEl.innerText = 'H:' + h + ' W:' + w;
-
       rotator.style.position = 'absolute';
       rotator.style.left = '0px';
       rotator.style.top = '0px';
@@ -806,12 +908,12 @@
         var transformStr = 'translate(' + safeLandscapeH + 'px, 0px) rotate(90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
-        document.getElementById('val-rot-label').innerText = '90°';
+        document.getElementById('val-rot-label').innerText = '90° 画面回転';
       } else if (currentRotation === '270') {
         var transformStr = 'translate(0px, ' + safeLandscapeW + 'px) rotate(-90deg)';
         rotator.style.webkitTransform = transformStr;
         rotator.style.transform = transformStr;
-        document.getElementById('val-rot-label').innerText = '270°';
+        document.getElementById('val-rot-label').innerText = '270° 画面回転';
       } else {
         // '0' (Portrait)
         rotator.style.width = (w - 8) + 'px';
@@ -820,28 +922,11 @@
         rotator.style.top = '4px';
         rotator.style.webkitTransform = 'none';
         rotator.style.transform = 'none';
-        document.getElementById('val-rot-label').innerText = '0°';
+        document.getElementById('val-rot-label').innerText = '0° 画面回転';
       }
 
       window.scrollTo(0, 0);
-      updateScrollStats();
     }
-
-    function updateScrollStats() {
-      var top = window.pageYOffset || (document.documentElement ? document.documentElement.scrollTop : 0) || (document.body ? document.body.scrollTop : 0) || 0;
-      var left = window.pageXOffset || (document.documentElement ? document.documentElement.scrollLeft : 0) || (document.body ? document.body.scrollLeft : 0) || 0;
-      var scrH = document.documentElement ? document.documentElement.scrollHeight : 0;
-      var el = document.getElementById('diag-scroll-stats');
-      if (el) el.innerText = 'T:' + top + ' L:' + left;
-      var scrEl = document.getElementById('diag-scr-h');
-      if (scrEl) scrEl.innerText = 'Scr:' + scrH;
-    }
-
-    try {
-      document.addEventListener('touchmove', function(e) {
-        if (e.preventDefault) e.preventDefault();
-      }, false);
-    } catch (e) {}
 
     function setRotation(rot) {
       currentRotation = rot;
@@ -863,7 +948,12 @@
     }
 
     window.addEventListener('resize', applyRotation);
-    window.addEventListener('scroll', updateScrollStats, false);
+
+    try {
+      document.addEventListener('touchmove', function(e) {
+        if (e.preventDefault) e.preventDefault();
+      }, false);
+    } catch (e) {}
 
     function clearGhosting() {
       document.body.className = 'flash-invert';

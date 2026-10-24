@@ -7,6 +7,7 @@ edition = "2024"
 axum = "0.8.9"
 chrono = { version = "0.4.45", features = ["serde"] }
 local-ip-address = "0.6.13"
+nvml-wrapper = "0.13.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sysinfo = "0.39.6"
