@@ -304,7 +304,7 @@
     }
 
     /* ========================================================
-       PC Sleep Overlay
+       PC Sleep Fullscreen Card (Bold E-ink Typography)
        ======================================================== */
     #sleep-overlay {
       display: none;
@@ -321,49 +321,54 @@
       text-align: center;
     }
 
-    .sleep-icon {
-      font-size: 3.5rem;
-      line-height: 1;
-      font-weight: 900;
-      margin-bottom: 6px;
+    .sleep-fullscreen-card {
+      width: 100%;
+      height: 100%;
+      border: 6px solid #000000;
+      background-color: #ffffff;
+      padding: 24px 30px;
+      box-sizing: border-box;
+      display: table;
+      table-layout: fixed;
     }
 
-    .sleep-box {
-      border: 5px solid #000000;
-      padding: 24px 28px;
-      max-width: 500px;
-      margin: 60px auto 0 auto;
-      background-color: #ffffff;
+    .sleep-cell {
+      display: table-cell;
+      vertical-align: middle;
       text-align: center;
     }
 
-    .sleep-title {
-      font-size: 2.2rem;
+    .sleep-big-icon {
+      font-size: 5.5rem;
+      line-height: 1;
       font-weight: 900;
-      letter-spacing: 2px;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
     }
 
-    .sleep-sub {
-      font-size: 1.15rem;
-      font-weight: 800;
-      margin-bottom: 12px;
+    .sleep-big-title {
+      font-size: 3.8rem;
+      font-weight: 900;
+      letter-spacing: 4px;
+      line-height: 1.1;
+      margin-bottom: 20px;
     }
 
-    .sleep-details {
-      border-top: 3px dashed #000000;
-      border-bottom: 3px dashed #000000;
-      padding: 10px 0;
-      font-size: 1.1rem;
-      text-align: left;
-      line-height: 1.6;
+    .sleep-big-clock {
+      font-size: 6.2rem;
+      font-weight: 900;
+      font-family: "Courier New", Courier, monospace, sans-serif;
+      line-height: 1;
+      letter-spacing: 3px;
+      margin-bottom: 24px;
     }
 
-    .sleep-counter {
-      font-family: monospace;
-      font-size: 1.05rem;
-      font-weight: bold;
-      margin-top: 12px;
+    .sleep-footer-line {
+      border-top: 4px solid #000000;
+      padding-top: 18px;
+      font-size: 1.6rem;
+      font-weight: 900;
+      white-space: nowrap;
+      letter-spacing: 1px;
     }
 
     .flash-invert {
@@ -381,17 +386,14 @@
 
       <!-- PC Sleep Fullscreen Overlay -->
       <div id="sleep-overlay">
-        <div class="sleep-box">
-          <div class="sleep-icon">☾ Z z z</div>
-          <div class="sleep-title">PC スリープ中</div>
-          <div class="sleep-sub">ホストPCとの通信が途絶えました</div>
-          <div class="sleep-details">
-            <div>最終通信: <strong id="sleep-last-seen">--:--:--</strong></div>
-            <div>スリープ経過: <strong id="sleep-elapsed">0秒</strong></div>
-            <div>端末時計: <strong id="sleep-local-clock">--:--:--</strong></div>
-          </div>
-          <div class="sleep-counter" id="sleep-status-text">
-            再接続待機中... (試行 #<span id="sleep-retry-count">0</span>)
+        <div class="sleep-fullscreen-card">
+          <div class="sleep-cell">
+            <div class="sleep-big-icon">☾ Z z z</div>
+            <div class="sleep-big-title">PC スリープ中</div>
+            <div class="sleep-big-clock" id="sleep-local-clock">--:--:--</div>
+            <div class="sleep-footer-line">
+              スリープ <strong id="sleep-elapsed">0秒</strong> &nbsp; | &nbsp; 接続待機中 (試行 #<span id="sleep-retry-count">0</span>)
+            </div>
           </div>
         </div>
       </div>
@@ -698,12 +700,6 @@
       var sleepOverlay = document.getElementById('sleep-overlay');
       if (sleepOverlay) {
         sleepOverlay.style.display = 'block';
-      }
-
-      if (lastSuccessTime) {
-        document.getElementById('sleep-last-seen').innerText = formatTime(lastSuccessTime);
-      } else {
-        document.getElementById('sleep-last-seen').innerText = '未接続';
       }
 
       updateSleepStatus();
