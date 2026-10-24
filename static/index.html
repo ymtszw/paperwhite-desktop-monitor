@@ -108,7 +108,6 @@
 
     /* Tile Header */
     .tile-top {
-      display: table;
       width: 100%;
       border-bottom: 3px solid #000000;
       padding-bottom: 6px;
@@ -116,29 +115,10 @@
     }
 
     .tile-title {
-      display: table-cell;
-      font-size: 1.45rem;
+      font-size: 1.55rem;
       font-weight: 900;
-      letter-spacing: 1px;
-      vertical-align: middle;
+      letter-spacing: 1.5px;
       text-align: left;
-    }
-
-    .tile-tag {
-      display: table-cell;
-      font-size: 1.05rem;
-      font-weight: 800;
-      vertical-align: middle;
-      text-align: right;
-    }
-
-    .tile-badge {
-      display: inline-block;
-      border: 2px solid #000000;
-      padding: 1px 6px;
-      border-radius: 3px;
-      font-family: monospace;
-      font-weight: 900;
     }
 
     /* Large Center Metric */
@@ -266,41 +246,22 @@
     }
 
     .tile-action-icon {
-      font-size: 4.5rem;
+      font-size: 5rem;
       font-weight: 900;
       line-height: 1;
-      margin: 8px 0;
+      margin: 12px 0 6px 0;
     }
 
     .tile-action-label {
-      font-size: 1.6rem;
+      font-size: 1.7rem;
       font-weight: 900;
       letter-spacing: 1px;
     }
 
     .tile-action-sub {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       font-weight: 800;
       margin-top: 6px;
-    }
-
-    /* Utility Button */
-    .adj-btn {
-      background: #ffffff;
-      color: #000000;
-      border: 2px solid #000000;
-      font-weight: 900;
-      font-size: 0.9rem;
-      padding: 3px 8px;
-      border-radius: 3px;
-      cursor: pointer;
-      display: inline-block;
-      margin-top: 8px;
-    }
-
-    .adj-btn:active {
-      background: #000000;
-      color: #ffffff;
     }
 
     /* ========================================================
@@ -406,15 +367,15 @@
           <td class="tile-cell" id="cell-0">
             <div class="tile-box" id="tile-cpu">
               <div class="tile-top">
-                <span class="tile-title">CPU</span>
-                <span class="tile-tag"><span class="tile-badge" id="val-cpu-cores">--C</span></span>
+                <div class="tile-title">CPU</div>
               </div>
               <div class="tile-mid">
                 <div class="tile-num-wrap">
                   <span class="tile-num" id="val-cpu-num">0</span><span class="tile-pct">%</span>
                 </div>
                 <div class="tile-sub-stat">
-                  LOAD
+                  <div id="val-cpu-cores">--C</div>
+                  <div id="val-cpu-temp" style="display: none;">--°C</div>
                 </div>
               </div>
               <div class="hist-container" id="hist-cpu">
@@ -427,16 +388,15 @@
           <td class="tile-cell" id="cell-1">
             <div class="tile-box" id="tile-gpu">
               <div class="tile-top">
-                <span class="tile-title">GPU</span>
-                <span class="tile-tag"><span class="tile-badge" id="val-gpu-badge">GPU</span></span>
+                <div class="tile-title">GPU</div>
               </div>
               <div class="tile-mid">
                 <div class="tile-num-wrap">
                   <span class="tile-num" id="val-gpu-num">0</span><span class="tile-pct">%</span>
                 </div>
                 <div class="tile-sub-stat">
-                  <div><strong id="val-gpu-vram">0</strong>G VRAM</div>
                   <div id="val-gpu-temp">--°C</div>
+                  <div><strong id="val-gpu-vram">0</strong>G / <span id="val-gpu-vram-total">--</span>G</div>
                 </div>
               </div>
               <div class="hist-container" id="hist-gpu">
@@ -449,16 +409,15 @@
           <td class="tile-cell" id="cell-2">
             <div class="tile-box" id="tile-mem">
               <div class="tile-top">
-                <span class="tile-title">RAM</span>
-                <span class="tile-tag"><span class="tile-badge" id="val-mem-total-badge">--G</span></span>
+                <div class="tile-title">RAM</div>
               </div>
               <div class="tile-mid">
                 <div class="tile-num-wrap">
                   <span class="tile-num" id="val-mem-num">0</span><span class="tile-pct">%</span>
                 </div>
                 <div class="tile-sub-stat">
-                  <div>USED: <strong id="val-mem-used">0</strong>G</div>
-                  <div>FREE: <strong id="val-mem-free">0</strong>G</div>
+                  <div><strong id="val-mem-used">0</strong>G / <span id="val-mem-total">--</span>G</div>
+                  <div><strong id="val-mem-free">0</strong>G 空き</div>
                 </div>
               </div>
               <div class="hist-container" id="hist-mem">
@@ -474,8 +433,7 @@
           <td class="tile-cell" id="cell-3">
             <div class="tile-box" id="tile-net">
               <div class="tile-top">
-                <span class="tile-title">NETWORK</span>
-                <span class="tile-tag"><span class="tile-badge">LAN</span></span>
+                <div class="tile-title">NETWORK</div>
               </div>
               <div class="tile-mid" style="margin: 6px 0;">
                 <div style="width: 100%;">
@@ -497,8 +455,7 @@
           <td class="tile-cell" id="cell-4">
             <div class="tile-box" id="tile-disks">
               <div class="tile-top">
-                <span class="tile-title">STORAGE</span>
-                <span class="tile-tag"><span class="tile-badge" id="val-disk-count">DRIVES</span></span>
+                <div class="tile-title">STORAGE</div>
               </div>
               <div id="disks-container" style="overflow: hidden; padding-top: 4px;">
                 <!-- Drive rows generated dynamically by JS -->
@@ -510,17 +467,13 @@
           <td class="tile-cell" id="cell-5">
             <div class="tile-box tile-action" id="tile-rotate" onclick="cycleRotation()">
               <div class="tile-top">
-                <span class="tile-title">SYSTEM</span>
-                <span class="tile-tag"><span class="tile-badge">● ONLINE</span></span>
+                <div class="tile-title">SYSTEM</div>
               </div>
-              <div style="text-align: center; margin: 4px 0;">
+              <div style="text-align: center; margin: auto 0;">
                 <div class="tile-action-icon">⟳</div>
                 <div class="tile-action-label" id="val-rot-label">90° 画面回転</div>
-                <div class="tile-action-sub" id="val-hostname">PC</div>
-                <div class="tile-action-sub" style="font-family: monospace; font-size: 0.95rem;" id="val-ip">--</div>
-              </div>
-              <div style="border-top: 3px solid #000; padding-top: 6px; text-align: center;">
-                <button class="adj-btn" onclick="testSleepMode(); event.stopPropagation();">☾ 休止テスト</button>
+                <div class="tile-action-sub">タップで回転切替</div>
+                <div class="tile-action-sub" style="margin-top: 8px; font-weight: 900;" id="val-sys-temp"></div>
               </div>
             </div>
           </td>
@@ -621,16 +574,28 @@
       // 1. CPU
       var cpuPct = Math.round(data.cpu_usage || 0);
       document.getElementById('val-cpu-num').innerText = cpuPct;
-      document.getElementById('val-cpu-cores').innerText = (data.cpu_cores || 0) + 'C';
+      document.getElementById('val-cpu-cores').innerText = (data.cpu_cores || 0) + ' Cores';
+      var cpuTempElem = document.getElementById('val-cpu-temp');
+      if (cpuTempElem) {
+        if (data.cpu_temp) {
+          cpuTempElem.innerText = data.cpu_temp + '°C';
+          cpuTempElem.style.display = 'block';
+        } else {
+          cpuTempElem.innerText = '';
+          cpuTempElem.style.display = 'none';
+        }
+      }
       updateHistoryChart('hist-cpu', data.cpu_history, 100);
 
       // 2. GPU
       var gpuPct = Math.round(data.gpu_usage || 0);
       document.getElementById('val-gpu-num').innerText = gpuPct;
       document.getElementById('val-gpu-vram').innerText = (data.vram_used_gb || 0).toFixed(1);
+      var gpuTotalElem = document.getElementById('val-gpu-vram-total');
+      if (gpuTotalElem) {
+        gpuTotalElem.innerText = Math.round(data.vram_total_gb || 0);
+      }
       document.getElementById('val-gpu-temp').innerText = (data.gpu_temp ? data.gpu_temp + '°C' : '');
-      var gpuShort = (data.gpu_name || 'GPU').replace('NVIDIA GeForce ', '').replace('NVIDIA ', '');
-      document.getElementById('val-gpu-badge').innerText = gpuShort;
       updateHistoryChart('hist-gpu', data.gpu_history, 100);
 
       // 3. RAM
@@ -640,7 +605,10 @@
       var totalMem = Math.round(data.mem_total_gb || 0);
       var freeMem = Math.max(0, totalMem - Math.round(data.mem_used_gb || 0));
       document.getElementById('val-mem-free').innerText = freeMem;
-      document.getElementById('val-mem-total-badge').innerText = totalMem + 'G';
+      var memTotalElem = document.getElementById('val-mem-total');
+      if (memTotalElem) {
+        memTotalElem.innerText = totalMem;
+      }
       updateHistoryChart('hist-mem', data.mem_history, 100);
 
       // 4. Network
@@ -665,7 +633,6 @@
 
       // 5. Disks (All Non-Removable Drives)
       if (data.disks && data.disks.length > 0) {
-        document.getElementById('val-disk-count').innerText = data.disks.length + ' DRIVES';
         var dHtml = '';
         for (var di = 0; di < data.disks.length; di++) {
           var d = data.disks[di];
@@ -685,10 +652,17 @@
         document.getElementById('disks-container').innerHTML = dHtml;
       }
 
-      // 6. System / Host
-      document.getElementById('val-hostname').innerText = data.hostname || 'PC';
-      if (data.server_ip && data.server_port) {
-        document.getElementById('val-ip').innerText = data.server_ip + ':' + data.server_port;
+      // 6. System Tile Temps
+      var sysTempElem = document.getElementById('val-sys-temp');
+      if (sysTempElem) {
+        var temps = [];
+        if (data.cpu_temp) temps.push('CPU ' + data.cpu_temp + '°C');
+        if (data.gpu_temp) temps.push('GPU ' + data.gpu_temp + '°C');
+        if (temps.length > 0) {
+          sysTempElem.innerText = temps.join(' | ');
+        } else {
+          sysTempElem.innerText = '';
+        }
       }
     }
 

@@ -17,7 +17,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use sysinfo::{Disks, System};
+use sysinfo::{Components, Disks, System};
 use tokio::sync::RwLock;
 
 #[cfg(windows)]
@@ -144,6 +144,7 @@ pub struct SystemStatus {
     // CPU
     pub cpu_usage: f32, // smoothed %
     pub cpu_cores: usize,
+    pub cpu_temp: Option<u32>,
     pub cpu_history: Vec<f32>, // 20 points (0..100)
 
     // GPU
@@ -302,6 +303,7 @@ async fn main() {
         let mut sys = System::new_all();
         let mut disks = Disks::new_with_refreshed_list();
         let mut networks = sysinfo::Networks::new_with_refreshed_list();
+        let mut components = Components::new_with_refreshed_list();
         let nvml = nvml_wrapper::Nvml::init().ok();
 
         let hostname = System::host_name().unwrap_or_else(|| "PC".to_string());
@@ -345,6 +347,19 @@ async fn main() {
             sys.refresh_memory();
             disks.refresh(true);
             networks.refresh(true);
+            components.refresh(true);
+
+            // CPU Temperature if available from components
+            let cpu_temp: Option<u32> = components.iter().find_map(|c| {
+                let label = c.label().to_lowercase();
+                if label.contains("cpu") || label.contains("core") || label.contains("package") || label.contains("tz") {
+                    c.temperature().map(|t| t.round() as u32)
+                } else {
+                    None
+                }
+            }).or_else(|| {
+                components.iter().next().and_then(|c| c.temperature().map(|t| t.round() as u32))
+            });
 
             // 1. CPU
             let instant_cpu = sys.global_cpu_usage();
@@ -466,6 +481,7 @@ async fn main() {
 
                 lock.cpu_usage = cpu_avg;
                 lock.cpu_cores = cpu_cores;
+                lock.cpu_temp = cpu_temp;
                 lock.cpu_history = cpu_hist.iter().copied().collect();
 
                 lock.gpu_usage = gpu_avg;
