@@ -69,20 +69,20 @@
       box-sizing: border-box;
     }
 
-    /* 3 Columns x 2 Rows Bold Table Layout */
+    /* 3 Columns x 3 Rows Bold Table Layout */
     #tiles-table {
       width: 100%;
       height: 100%;
       table-layout: fixed;
       border-collapse: separate;
-      border-spacing: 8px;
-      padding: 4px;
+      border-spacing: 6px;
+      padding: 2px;
       box-sizing: border-box;
     }
 
     .tile-cell {
       width: 33.333%;
-      height: 50%;
+      height: 33.333%;
       padding: 0;
       margin: 0;
       vertical-align: top;
@@ -92,9 +92,9 @@
     .tile-box {
       width: 100%;
       height: 100%;
-      border: 4px solid #000000;
+      border: 3px solid #000000;
       background-color: #ffffff;
-      padding: 10px 14px;
+      padding: 6px 10px;
       box-sizing: border-box;
       display: -webkit-box;
       display: flex;
@@ -109,21 +109,21 @@
     /* Tile Header */
     .tile-top {
       width: 100%;
-      border-bottom: 3px solid #000000;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 3px;
+      margin-bottom: 3px;
     }
 
     .tile-title {
-      font-size: 1.55rem;
+      font-size: 1.3rem;
       font-weight: 900;
-      letter-spacing: 1.5px;
+      letter-spacing: 1px;
       text-align: left;
     }
 
     /* Large Center Metric */
     .tile-mid {
-      margin: 4px 0;
+      margin: 2px 0;
       display: -webkit-box;
       display: flex;
       -webkit-box-align: baseline;
@@ -138,31 +138,31 @@
     }
 
     .tile-num {
-      font-size: 4.2rem;
+      font-size: 3.2rem;
       font-weight: 900;
       line-height: 1;
       font-family: "Courier New", Courier, monospace, sans-serif;
     }
 
     .tile-pct {
-      font-size: 2.2rem;
+      font-size: 1.6rem;
       font-weight: 900;
       margin-left: 2px;
     }
 
     .tile-sub-stat {
-      font-size: 1.15rem;
+      font-size: 1.0rem;
       font-weight: 800;
       text-align: right;
-      line-height: 1.3;
+      line-height: 1.25;
     }
 
     /* Graphical History Sparkline Chart (20 vertical columns) */
     .hist-container {
       width: 100%;
-      height: 96px;
-      border-top: 3px solid #000000;
-      padding-top: 6px;
+      height: 64px;
+      border-top: 2px solid #000000;
+      padding-top: 3px;
       box-sizing: border-box;
       display: table;
       table-layout: fixed;
@@ -172,35 +172,35 @@
 
     .hist-col {
       display: table-cell;
-      height: 84px;
+      height: 56px;
       vertical-align: bottom;
-      padding: 0 2px;
+      padding: 0 1px;
       box-sizing: border-box;
     }
 
     .hist-bar {
       width: 100%;
       background-color: #000000;
-      min-height: 4px;
-      height: 4px;
+      min-height: 3px;
+      height: 3px;
       display: block;
       box-sizing: border-box;
     }
 
-    /* Multi-Disk Storage Rows (Compact 4-drive fit) */
+    /* Multi-Disk Storage Rows (Compact 4-drive fit for 3x3) */
     .disk-row {
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .disk-header {
       display: table;
       width: 100%;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
 
     .disk-name {
       display: table-cell;
-      font-size: 1.15rem;
+      font-size: 1.0rem;
       font-weight: 900;
       font-family: monospace;
       text-align: left;
@@ -208,14 +208,14 @@
 
     .disk-meta {
       display: table-cell;
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       font-weight: 800;
       text-align: right;
     }
 
     .disk-track {
       width: 100%;
-      height: 12px;
+      height: 9px;
       border: 2px solid #000000;
       background-color: #ffffff;
       box-sizing: border-box;
@@ -238,7 +238,7 @@
     }
 
     .system-info-box {
-      margin: 10px 0;
+      margin: 4px 0;
       width: 100%;
     }
 
@@ -246,7 +246,7 @@
       display: table;
       width: 100%;
       border-bottom: 2px solid #000000;
-      padding: 10px 0;
+      padding: 5px 0;
       box-sizing: border-box;
     }
 
@@ -256,7 +256,7 @@
 
     .system-info-label {
       display: table-cell;
-      font-size: 1.25rem;
+      font-size: 1.05rem;
       font-weight: 900;
       letter-spacing: 1px;
       text-align: left;
@@ -265,7 +265,7 @@
 
     .system-info-val {
       display: table-cell;
-      font-size: 1.55rem;
+      font-size: 1.3rem;
       font-weight: 900;
       text-align: right;
       vertical-align: middle;
@@ -274,8 +274,8 @@
 
     .system-action-box {
       width: 100%;
-      height: 52px;
-      border: 3px solid #000000;
+      height: 44px;
+      border: 2px solid #000000;
       background-color: #000000;
       color: #ffffff;
       display: -webkit-box;
@@ -290,20 +290,20 @@
       box-sizing: border-box;
       flex-shrink: 0;
       margin-top: auto;
-      border-radius: 4px;
+      border-radius: 3px;
     }
 
     .system-action-icon {
-      font-size: 1.8rem;
+      font-size: 1.6rem;
       line-height: 1;
       font-weight: 900;
-      margin-right: 8px;
+      margin-right: 6px;
     }
 
     .system-action-btn-text {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       font-weight: 900;
-      letter-spacing: 1.5px;
+      letter-spacing: 1px;
     }
 
     /* ========================================================
@@ -528,6 +528,78 @@
             </div>
           </td>
         </tr>
+
+        <!-- Row 3: DUMMY TILES -->
+        <tr>
+          <!-- Cell 6: TOP APPS (Dummy) -->
+          <td class="tile-cell" id="cell-6">
+            <div class="tile-box" id="tile-apps">
+              <div class="tile-top">
+                <div class="tile-title">TOP APPS</div>
+              </div>
+              <div style="width: 100%; margin: 2px 0;">
+                <div style="display: table; width: 100%; padding: 2px 0; border-bottom: 1px solid #000;">
+                  <span style="display: table-cell; font-weight: 900; font-size: 0.95rem;">Chrome</span>
+                  <span style="display: table-cell; text-align: right; font-weight: 900; font-size: 0.95rem;">12.4%</span>
+                </div>
+                <div style="display: table; width: 100%; padding: 2px 0; border-bottom: 1px solid #000;">
+                  <span style="display: table-cell; font-weight: 900; font-size: 0.95rem;">Code.exe</span>
+                  <span style="display: table-cell; text-align: right; font-weight: 900; font-size: 0.95rem;">7.8%</span>
+                </div>
+                <div style="display: table; width: 100%; padding: 2px 0;">
+                  <span style="display: table-cell; font-weight: 900; font-size: 0.95rem;">Rustc</span>
+                  <span style="display: table-cell; text-align: right; font-weight: 900; font-size: 0.95rem;">4.1%</span>
+                </div>
+              </div>
+              <div class="hist-container" id="hist-dummy-apps">
+                <!-- 20 columns generated by JS -->
+              </div>
+            </div>
+          </td>
+
+          <!-- Cell 7: COOLING / FAN (Dummy) -->
+          <td class="tile-cell" id="cell-7">
+            <div class="tile-box" id="tile-cooling">
+              <div class="tile-top">
+                <div class="tile-title">COOLING</div>
+              </div>
+              <div class="tile-mid">
+                <div class="tile-num-wrap">
+                  <span class="tile-num" id="val-fan-num" style="font-size: 2.4rem;">1420</span><span class="tile-pct" style="font-size: 1.1rem;">RPM</span>
+                </div>
+                <div class="tile-sub-stat">
+                  <div>AUTO</div>
+                  <div>38% PWM</div>
+                </div>
+              </div>
+              <div class="hist-container" id="hist-dummy-fan">
+                <!-- 20 columns generated by JS -->
+              </div>
+            </div>
+          </td>
+
+          <!-- Cell 8: CLOCK / CALENDAR (Realtime Dynamic) -->
+          <td class="tile-cell" id="cell-8">
+            <div class="tile-box" id="tile-clock">
+              <div class="tile-top">
+                <div class="tile-title">CLOCK</div>
+              </div>
+              <div class="tile-mid">
+                <div class="tile-num-wrap">
+                  <span class="tile-num" id="val-dash-clock" style="font-size: 2.6rem; font-family: inherit;">--:--</span>
+                </div>
+                <div class="tile-sub-stat">
+                  <div id="val-dash-date">--/--</div>
+                  <div id="val-dash-day">---</div>
+                </div>
+              </div>
+              <div style="width: 100%; border-top: 2px solid #000; padding-top: 6px; margin-top: auto; text-align: center;">
+                <div style="font-size: 1.05rem; font-weight: 900; letter-spacing: 1px;">DESK MONITOR</div>
+                <div style="font-size: 0.85rem; font-weight: 800; font-family: monospace; margin-top: 2px;">PW3 GADGET</div>
+              </div>
+            </div>
+          </td>
+        </tr>
       </table>
 
     </div>
@@ -582,6 +654,11 @@
     initHistoryBars('hist-gpu');
     initHistoryBars('hist-mem');
     initHistoryBars('hist-net');
+    initHistoryBars('hist-dummy-apps');
+    initHistoryBars('hist-dummy-fan');
+
+    var dummyAppsWave = [15, 18, 22, 28, 25, 20, 18, 24, 30, 35, 28, 22, 19, 25, 32, 28, 24, 20, 18, 22];
+    var dummyFanWave = [35, 36, 38, 38, 40, 39, 38, 38, 37, 38, 39, 40, 42, 41, 40, 39, 38, 38, 38, 38];
 
     function updateHistoryChart(containerId, dataArray, maxVal) {
       var container = document.getElementById(containerId);
@@ -599,13 +676,13 @@
         }
       }
 
-      var maxBarPx = 76;
+      var maxBarPx = 50;
       var len = bars.length;
       var dataLen = dataArray ? dataArray.length : 0;
       for (var i = 0; i < len; i++) {
         var dataIdx = dataLen - len + i;
         var val = (dataIdx >= 0 && dataIdx < dataLen) ? dataArray[dataIdx] : 0;
-        var barPx = Math.min(maxBarPx, Math.max(4, Math.round((val / max) * maxBarPx)));
+        var barPx = Math.min(maxBarPx, Math.max(3, Math.round((val / max) * maxBarPx)));
         bars[i].style.height = barPx + 'px';
       }
     }
@@ -707,6 +784,25 @@
           sysTempElem.innerText = '--°C';
         }
       }
+
+      // 7. Update Clock Tile (Realtime Dynamic)
+      var now = new Date();
+      var cHours = padZero(now.getHours());
+      var cMins = padZero(now.getMinutes());
+      var cMonth = padZero(now.getMonth() + 1);
+      var cDate = padZero(now.getDate());
+      var days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+      var cDay = days[now.getDay()];
+      var dashClock = document.getElementById('val-dash-clock');
+      if (dashClock) dashClock.innerText = cHours + ':' + cMins;
+      var dashDate = document.getElementById('val-dash-date');
+      if (dashDate) dashDate.innerText = cMonth + '/' + cDate;
+      var dashDay = document.getElementById('val-dash-day');
+      if (dashDay) dashDay.innerText = cDay;
+
+      // Update dummy charts
+      updateHistoryChart('hist-dummy-apps', dummyAppsWave, 100);
+      updateHistoryChart('hist-dummy-fan', dummyFanWave, 100);
     }
 
     function enterSleepMode() {
