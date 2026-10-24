@@ -843,7 +843,6 @@ dependencies = [
  "nvml-wrapper",
  "reqwest",
  "serde",
- "serde_json",
  "sysinfo",
  "tokio",
  "wmi",

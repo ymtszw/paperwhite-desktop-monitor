@@ -2,6 +2,8 @@
 name = "paperwhite-desktop-monitor"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "High-contrast E-ink dashboard server for Kindle Paperwhite PC and NAS monitoring"
 
 [dependencies]
 axum = "0.8.9"
@@ -10,7 +12,6 @@ local-ip-address = "0.6.13"
 nvml-wrapper = "0.13.0"
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
 sysinfo = "0.39.6"
 tokio = { version = "1.54.1", features = ["full", "macros"] }
 wmi = "0.18.4"

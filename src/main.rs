@@ -1,12 +1,12 @@
 #![windows_subsystem = "windows"]
 
 use axum::{
+    Router,
     extract::{ConnectInfo, Request},
-    http::{header, HeaderValue, StatusCode},
+    http::{HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{Html, IntoResponse, Json, Response},
     routing::get,
-    Router,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -70,7 +70,10 @@ mod win_thermal {
     const PDH_FMT_DOUBLE: u32 = 0x00000200;
 
     fn to_wide(s: &str) -> Vec<u16> {
-        OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+        OsStr::new(s)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
     }
 
     pub struct ThermalReader {
@@ -138,7 +141,8 @@ mod win_thermal {
                         PDH_FMT_DOUBLE,
                         &mut val_type,
                         &mut val,
-                    ) == 0 {
+                    ) == 0
+                    {
                         let kelvin = val.double_value;
                         if kelvin > 200.0 && kelvin < 400.0 {
                             let c = kelvin - 273.15;
@@ -194,7 +198,10 @@ mod win_eventlog {
     const EVENTLOG_ERROR_TYPE: u16 = 1;
 
     fn to_wide(s: &str) -> Vec<u16> {
-        OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+        OsStr::new(s)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
     }
 
     pub fn write_event(msg: &str, is_error: bool) {
@@ -239,7 +246,11 @@ pub fn app_log(msg: &str) {
     if let Ok(_guard) = LOG_LOCK.lock() {
         // Write to logs/server.log
         let _ = std::fs::create_dir_all("logs");
-        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("logs/server.log") {
+        if let Ok(mut f) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("logs/server.log")
+        {
             let _ = f.write_all(line.as_bytes());
         }
     }
@@ -254,7 +265,11 @@ pub fn app_error(msg: &str) {
 
     if let Ok(_guard) = LOG_LOCK.lock() {
         let _ = std::fs::create_dir_all("logs");
-        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("logs/server.log") {
+        if let Ok(mut f) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("logs/server.log")
+        {
             let _ = f.write_all(line.as_bytes());
         }
     }
@@ -274,9 +289,6 @@ mod win_fans {
     struct WmiSensor {
         name: String,
         value: f32,
-        sensor_type: String,
-        #[serde(default)]
-        identifier: String,
     }
 
     pub fn query_fans() -> (Option<u32>, Vec<FanInfo>) {
@@ -286,23 +298,20 @@ mod win_fans {
         let namespaces = ["ROOT\\LibreHardwareMonitor", "ROOT\\OpenHardwareMonitor"];
         for ns in namespaces {
             if let Ok(wmi_con) = WMIConnection::with_namespace_path(ns) {
-                let query = "SELECT Name, Value, SensorType, Identifier FROM Sensor WHERE SensorType = 'Fan'";
-                if let Ok(sensors) = wmi_con.raw_query::<WmiSensor>(query) {
-                    if !sensors.is_empty() {
-                        for s in sensors {
-                            let rpm = s.value.round() as u32;
-                            let lower = s.name.to_lowercase();
-                            if lower.contains("cpu") && cpu_fan.is_none() {
-                                cpu_fan = Some(rpm);
-                            } else if !lower.contains("gpu") {
-                                case_fans.push(FanInfo {
-                                    name: s.name,
-                                    rpm,
-                                });
-                            }
+                let query = "SELECT Name, Value FROM Sensor WHERE SensorType = 'Fan'";
+                if let Ok(sensors) = wmi_con.raw_query::<WmiSensor>(query)
+                    && !sensors.is_empty()
+                {
+                    for s in sensors {
+                        let rpm = s.value.round() as u32;
+                        let lower = s.name.to_lowercase();
+                        if lower.contains("cpu") && cpu_fan.is_none() {
+                            cpu_fan = Some(rpm);
+                        } else if !lower.contains("gpu") {
+                            case_fans.push(FanInfo { name: s.name, rpm });
                         }
-                        return (cpu_fan, case_fans);
                     }
+                    return (cpu_fan, case_fans);
                 }
             }
         }
@@ -392,7 +401,7 @@ pub struct SystemStatus {
     // RAM
     pub mem_total_gb: f64,
     pub mem_used_gb: f64,
-    pub mem_percent: f64, // smoothed %
+    pub mem_percent: f64,      // smoothed %
     pub mem_history: Vec<f64>, // 20 points (0..100)
 
     // Network
@@ -427,7 +436,6 @@ fn is_local_or_lan(ip: IpAddr) -> bool {
     }
 }
 
-
 /// Middleware to enforce Local / Private LAN access only
 async fn lan_access_middleware(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -435,7 +443,10 @@ async fn lan_access_middleware(
     next: Next,
 ) -> Response {
     if !is_local_or_lan(addr.ip()) {
-        app_error(&format!("[BLOCKED] Access denied from non-LAN IP: {}", addr));
+        app_error(&format!(
+            "[BLOCKED] Access denied from non-LAN IP: {}",
+            addr
+        ));
         return (
             StatusCode::FORBIDDEN,
             "403 Forbidden: Access is restricted to local LAN only.",
@@ -448,30 +459,35 @@ async fn lan_access_middleware(
 /// Serve dashboard index page
 async fn serve_index() -> impl IntoResponse {
     (
-        [(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("text/html; charset=utf-8"),
-        ),
-        (
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("no-cache, no-store, must-revalidate"),
-        )],
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/html; charset=utf-8"),
+            ),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+            ),
+        ],
         Html(INDEX_HTML),
     )
 }
 
 /// Serve recent logs
 async fn serve_logs() -> impl IntoResponse {
-    let content = std::fs::read_to_string("logs/server.log").unwrap_or_else(|_| "No logs recorded yet.".to_string());
+    let content = std::fs::read_to_string("logs/server.log")
+        .unwrap_or_else(|_| "No logs recorded yet.".to_string());
     (
-        [(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("text/plain; charset=utf-8"),
-        ),
-        (
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("no-store, no-cache, must-revalidate"),
-        )],
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/plain; charset=utf-8"),
+            ),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+            ),
+        ],
         content,
     )
 }
@@ -599,16 +615,25 @@ async fn main() {
 
             // CPU / Thermal Zone Temperature (PDH native on Windows)
             #[cfg(windows)]
-            let cpu_temp: Option<u32> = thermal_reader.as_ref().and_then(|t| t.read_celsius()).or_else(|| {
-                components.iter().find_map(|c| c.temperature().map(|t| t.round() as u32))
-            });
+            let cpu_temp: Option<u32> = thermal_reader
+                .as_ref()
+                .and_then(|t| t.read_celsius())
+                .or_else(|| {
+                    components
+                        .iter()
+                        .find_map(|c| c.temperature().map(|t| t.round() as u32))
+                });
             #[cfg(not(windows))]
-            let cpu_temp: Option<u32> = components.iter().find_map(|c| c.temperature().map(|t| t.round() as u32));
+            let cpu_temp: Option<u32> = components
+                .iter()
+                .find_map(|c| c.temperature().map(|t| t.round() as u32));
 
             // 1. CPU
             let instant_cpu = sys.global_cpu_usage();
             cpu_smooth.push_back(instant_cpu);
-            if cpu_smooth.len() > SMOOTH_WINDOW { cpu_smooth.pop_front(); }
+            if cpu_smooth.len() > SMOOTH_WINDOW {
+                cpu_smooth.pop_front();
+            }
             let cpu_avg = cpu_smooth.iter().sum::<f32>() / cpu_smooth.len() as f32;
 
             // 2. RAM
@@ -622,7 +647,9 @@ async fn main() {
                 0.0
             };
             mem_smooth.push_back(instant_mem_pct);
-            if mem_smooth.len() > SMOOTH_WINDOW { mem_smooth.pop_front(); }
+            if mem_smooth.len() > SMOOTH_WINDOW {
+                mem_smooth.pop_front();
+            }
             let mem_avg = mem_smooth.iter().sum::<f64>() / mem_smooth.len() as f64;
 
             // 3. GPU
@@ -631,25 +658,29 @@ async fn main() {
             let mut vram_total_gb = 0.0f64;
             let mut gpu_temp = 0u32;
             let mut gpu_fan: Option<u32> = None;
-            if let Some(ref n) = nvml {
-                if let Ok(dev) = n.device_by_index(0) {
-                    if let Ok(util) = dev.utilization_rates() {
-                        instant_gpu = util.gpu as f32;
-                    }
-                    if let Ok(mem) = dev.memory_info() {
-                        vram_used_gb = mem.used as f64 / 1_073_741_824.0;
-                        vram_total_gb = mem.total as f64 / 1_073_741_824.0;
-                    }
-                    if let Ok(temp) = dev.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu) {
-                        gpu_temp = temp;
-                    }
-                    if let Ok(fan) = dev.fan_speed(0) {
-                        gpu_fan = Some(fan);
-                    }
+            if let Some(ref n) = nvml
+                && let Ok(dev) = n.device_by_index(0)
+            {
+                if let Ok(util) = dev.utilization_rates() {
+                    instant_gpu = util.gpu as f32;
+                }
+                if let Ok(mem) = dev.memory_info() {
+                    vram_used_gb = mem.used as f64 / 1_073_741_824.0;
+                    vram_total_gb = mem.total as f64 / 1_073_741_824.0;
+                }
+                if let Ok(temp) =
+                    dev.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+                {
+                    gpu_temp = temp;
+                }
+                if let Ok(fan) = dev.fan_speed(0) {
+                    gpu_fan = Some(fan);
                 }
             }
             gpu_smooth.push_back(instant_gpu);
-            if gpu_smooth.len() > SMOOTH_WINDOW { gpu_smooth.pop_front(); }
+            if gpu_smooth.len() > SMOOTH_WINDOW {
+                gpu_smooth.pop_front();
+            }
             let gpu_avg = gpu_smooth.iter().sum::<f32>() / gpu_smooth.len() as f32;
 
             // 4. Network
@@ -664,39 +695,58 @@ async fn main() {
             let instant_rx_kb = total_rx_bytes as f64 / 1024.0;
             let instant_tx_kb = total_tx_bytes as f64 / 1024.0;
             net_in_smooth.push_back(instant_rx_kb);
-            if net_in_smooth.len() > SMOOTH_WINDOW { net_in_smooth.pop_front(); }
+            if net_in_smooth.len() > SMOOTH_WINDOW {
+                net_in_smooth.pop_front();
+            }
             let net_in_avg = net_in_smooth.iter().sum::<f64>() / net_in_smooth.len() as f64;
 
             net_out_smooth.push_back(instant_tx_kb);
-            if net_out_smooth.len() > SMOOTH_WINDOW { net_out_smooth.pop_front(); }
+            if net_out_smooth.len() > SMOOTH_WINDOW {
+                net_out_smooth.pop_front();
+            }
             let net_out_avg = net_out_smooth.iter().sum::<f64>() / net_out_smooth.len() as f64;
 
             // History & NAS sampling every 2 seconds
             second_counter += 1;
-            if second_counter % 2 == 0 {
+            if second_counter.is_multiple_of(2) {
                 cpu_hist.push_back(cpu_avg);
-                if cpu_hist.len() > HIST_LEN { cpu_hist.pop_front(); }
+                if cpu_hist.len() > HIST_LEN {
+                    cpu_hist.pop_front();
+                }
 
                 mem_hist.push_back(mem_avg);
-                if mem_hist.len() > HIST_LEN { mem_hist.pop_front(); }
+                if mem_hist.len() > HIST_LEN {
+                    mem_hist.pop_front();
+                }
 
                 gpu_hist.push_back(gpu_avg);
-                if gpu_hist.len() > HIST_LEN { gpu_hist.pop_front(); }
+                if gpu_hist.len() > HIST_LEN {
+                    gpu_hist.pop_front();
+                }
 
                 net_in_hist.push_back(net_in_avg);
-                if net_in_hist.len() > HIST_LEN { net_in_hist.pop_front(); }
+                if net_in_hist.len() > HIST_LEN {
+                    net_in_hist.pop_front();
+                }
 
                 net_out_hist.push_back(net_out_avg);
-                if net_out_hist.len() > HIST_LEN { net_out_hist.pop_front(); }
+                if net_out_hist.len() > HIST_LEN {
+                    net_out_hist.pop_front();
+                }
 
                 // Query NAS stats
                 let client = http_client.clone();
-                let resp = client.get("http://192.168.0.12:8789/api/stats").send().await;
+                let resp = client
+                    .get("http://192.168.0.12:8789/api/stats")
+                    .send()
+                    .await;
                 if let Ok(res) = resp {
                     if let Ok(mut stats) = res.json::<NasStats>().await {
                         stats.online = true;
                         nas_cpu_hist.push_back(stats.cpu_pct);
-                        if nas_cpu_hist.len() > HIST_LEN { nas_cpu_hist.pop_front(); }
+                        if nas_cpu_hist.len() > HIST_LEN {
+                            nas_cpu_hist.pop_front();
+                        }
                         stats.cpu_history = nas_cpu_hist.iter().copied().collect();
                         last_nas_stats = Some(stats);
                     }
@@ -707,7 +757,9 @@ async fn main() {
                 // Query Hardware Fan sensors via WMI (LibreHardwareMonitor / OpenHardwareMonitor)
                 #[cfg(windows)]
                 {
-                    if let Ok((c_fan, c_fans)) = tokio::task::spawn_blocking(win_fans::query_fans).await {
+                    if let Ok((c_fan, c_fans)) =
+                        tokio::task::spawn_blocking(win_fans::query_fans).await
+                    {
                         if c_fan.is_some() {
                             last_cpu_fan = c_fan;
                         }
@@ -744,7 +796,7 @@ async fn main() {
                     usage_percent: usage_pct,
                 });
             }
-            disk_list.sort_by(|a, b| a.name.to_uppercase().cmp(&b.name.to_uppercase()));
+            disk_list.sort_by_key(|a| a.name.to_uppercase());
 
             // Write into shared state
             {
@@ -801,12 +853,18 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(bind_addr).await {
         Ok(l) => l,
         Err(e) => {
-            app_error(&format!("Failed to bind TCP listener on {}: {}", bind_addr, e));
+            app_error(&format!(
+                "Failed to bind TCP listener on {}: {}",
+                bind_addr, e
+            ));
             std::process::exit(1);
         }
     };
 
-    app_log(&format!("Server listening on {} (LAN: {})", bind_addr, local_ip));
+    app_log(&format!(
+        "Server listening on {} (LAN: {})",
+        bind_addr, local_ip
+    ));
 
     if let Err(e) = axum::serve(
         listener,
