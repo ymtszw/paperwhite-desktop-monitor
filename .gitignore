@@ -1,3 +1,5 @@
 /target
 /logs
 /tools
+switchbot.json
+*.local.json
