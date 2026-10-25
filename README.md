@@ -49,8 +49,26 @@ Kindle Paperwhite (第7世代 マンガモデル等) の「体験型ブラウザ
 ======================================================
 ```
 
-### 2. PC起動時の自動起動（Windows スタートアップ登録）
-同梱の **`setup_autostart.bat`** を実行すると、Windows のスタートアップに自動登録されます：
+### 2. 設定ファイル (`config.json`)
+NAS や SwitchBot 温湿度計と連携する場合、`config.example.json` をコピーして `config.json` を作成します（Git 管理外）：
+
+```json
+{
+  "nas": {
+    "statsUrl": "http://192.168.0.12:8789/api/stats"
+  },
+  "switchbot": {
+    "token": "YOUR_SWITCHBOT_TOKEN",
+    "secret": "YOUR_SWITCHBOT_SECRET",
+    "deviceId": "YOUR_DEVICE_ID",
+    "deviceName": "リビング温湿度計"
+  }
+}
+```
+※ 未設定の場合は該当パネルが自動でスタンバイ表示になります。
+
+### 3. PC起動時の自動起動（Windows スタートアップ登録）
+同梱の **`setup_autostart.bat`** を実行すると、Windows の `CurrentVersion\Run` レジストリに登録され、Windows の「設定」→「アプリ」→「スタートアップ」一覧に登録されます：
 - PC 起動／ユーザーログイン時に、バックグラウンド（黒いコンソール画面を出さず完全非表示）で自動起動します。
 - 解除したい場合は **`remove_autostart.bat`** を実行するだけで即座に解除できます。
 - プロセスを停止したいときは **`stop.bat`** を実行します。

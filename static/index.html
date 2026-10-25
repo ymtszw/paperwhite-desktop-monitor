@@ -484,16 +484,7 @@
       font-weight: 900;
       letter-spacing: 4px;
       line-height: 1.1;
-      margin-bottom: 20px;
-    }
-
-    .sleep-big-clock {
-      font-size: 6.2rem;
-      font-weight: 900;
-      font-family: "Courier New", Courier, monospace, sans-serif;
-      line-height: 1;
-      letter-spacing: 3px;
-      margin-bottom: 24px;
+      margin-bottom: 28px;
     }
 
     .sleep-footer-line {
@@ -524,7 +515,6 @@
           <div class="sleep-cell">
             <div class="sleep-big-icon">☾ Z z z</div>
             <div class="sleep-big-title">PC スリープ中</div>
-            <div class="sleep-big-clock" id="sleep-local-clock">--:--:--</div>
             <div class="sleep-footer-line">
               スリープ <strong id="sleep-elapsed">0秒</strong> &nbsp; | &nbsp; 接続待機中 (試行 #<span id="sleep-retry-count">0</span>)
             </div>
@@ -1087,9 +1077,8 @@
 
     function updateSleepStatus() {
       if (!isSleeping) return;
-      var now = new Date();
-      document.getElementById('sleep-local-clock').innerText = formatTime(now);
       if (sleepStartTime) {
+        var now = new Date();
         var elapsedSec = (now.getTime() - sleepStartTime.getTime()) / 1000;
         document.getElementById('sleep-elapsed').innerText = formatElapsed(elapsedSec);
       }

@@ -335,14 +335,57 @@ pub struct NasStats {
     pub cpu_history: Vec<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct AppConfig {
+    #[serde(default)]
+    pub nas: Option<NasConfig>,
+    #[serde(default)]
+    pub switchbot: Option<SwitchBotConfigFile>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct NasConfig {
+    #[serde(rename = "statsUrl", default)]
+    pub stats_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct SwitchBotConfigFile {
+    #[serde(default)]
     pub token: String,
+    #[serde(default)]
     pub secret: String,
-    #[serde(rename = "deviceId")]
+    #[serde(rename = "deviceId", default)]
     pub device_id: String,
     #[serde(rename = "deviceName", default)]
     pub device_name: String,
+}
+
+impl AppConfig {
+    pub fn load() -> Self {
+        let mut cfg = if let Ok(s) = std::fs::read_to_string("config.json") {
+            serde_json::from_str::<AppConfig>(&s).unwrap_or_default()
+        } else {
+            AppConfig::default()
+        };
+
+        if cfg.switchbot.is_none()
+            && let Ok(s) = std::fs::read_to_string("switchbot.json")
+            && let Ok(sb) = serde_json::from_str::<SwitchBotConfigFile>(&s)
+        {
+            cfg.switchbot = Some(sb);
+        }
+
+        if let Ok(env_url) = std::env::var("NAS_STATS_URL")
+            && !env_url.trim().is_empty()
+        {
+            cfg.nas = Some(NasConfig {
+                stats_url: env_url.trim().to_string(),
+            });
+        }
+
+        cfg
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -625,124 +668,119 @@ async fn main() {
         ..Default::default()
     }));
 
+    let app_config = AppConfig::load();
+    let nas_stats_url = app_config.nas.as_ref().map(|n| n.stats_url.clone());
+
     // Background SwitchBot polling task (samples every 30s)
-    let status_for_sb = Arc::clone(&shared_status);
-    tokio::spawn(async move {
-        let config_str = match std::fs::read_to_string("switchbot.json") {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-        let config: SwitchBotConfigFile = match serde_json::from_str(&config_str) {
-            Ok(c) => c,
-            Err(e) => {
-                app_log(&format!("Failed to parse switchbot.json: {e}"));
-                return;
-            }
-        };
+    if let Some(config) = app_config.switchbot {
+        let status_for_sb = Arc::clone(&shared_status);
+        tokio::spawn(async move {
+            app_log(&format!(
+                "SwitchBot polling task started for device {} ({})",
+                config.device_id, config.device_name
+            ));
 
-        app_log(&format!(
-            "SwitchBot polling task started for device {} ({})",
-            config.device_id, config.device_name
-        ));
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .unwrap_or_default();
 
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .unwrap_or_default();
+            const HIST_LEN: usize = 20;
+            const HIST_INTERVAL_SECS: u64 = 180; // 3 minutes per point, 20 points = 60 minutes
+            let mut temp_hist: VecDeque<f64> = VecDeque::with_capacity(HIST_LEN);
+            let mut hum_hist: VecDeque<u32> = VecDeque::with_capacity(HIST_LEN);
+            let mut last_hist_record = Instant::now();
 
-        const HIST_LEN: usize = 20;
-        const HIST_INTERVAL_SECS: u64 = 180; // 3 minutes per point, 20 points = 60 minutes
-        let mut temp_hist: VecDeque<f64> = VecDeque::with_capacity(HIST_LEN);
-        let mut hum_hist: VecDeque<u32> = VecDeque::with_capacity(HIST_LEN);
-        let mut last_hist_record = Instant::now();
+            loop {
+                let t = chrono::Utc::now().timestamp_millis().to_string();
+                let nonce = format!("{}-{}", t, std::process::id());
+                let sign_data = format!("{}{}{}", config.token, t, nonce);
 
-        loop {
-            let t = chrono::Utc::now().timestamp_millis().to_string();
-            let nonce = format!("{}-{}", t, std::process::id());
-            let sign_data = format!("{}{}{}", config.token, t, nonce);
+                let mut signature = String::new();
+                if let Ok(mut mac) = HmacSha256::new_from_slice(config.secret.as_bytes()) {
+                    mac.update(sign_data.as_bytes());
+                    let result = mac.finalize().into_bytes();
+                    signature = base64::engine::general_purpose::STANDARD.encode(result);
+                }
 
-            let mut signature = String::new();
-            if let Ok(mut mac) = HmacSha256::new_from_slice(config.secret.as_bytes()) {
-                mac.update(sign_data.as_bytes());
-                let result = mac.finalize().into_bytes();
-                signature = base64::engine::general_purpose::STANDARD.encode(result);
-            }
+                let url = format!(
+                    "https://api.switch-bot.com/v1.1/devices/{}/status",
+                    config.device_id
+                );
+                let resp = client
+                    .get(&url)
+                    .header("Authorization", &config.token)
+                    .header("sign", signature)
+                    .header("t", &t)
+                    .header("nonce", &nonce)
+                    .header("Content-Type", "application/json")
+                    .send()
+                    .await;
 
-            let url = format!(
-                "https://api.switch-bot.com/v1.1/devices/{}/status",
-                config.device_id
-            );
-            let resp = client
-                .get(&url)
-                .header("Authorization", &config.token)
-                .header("sign", signature)
-                .header("t", &t)
-                .header("nonce", &nonce)
-                .header("Content-Type", "application/json")
-                .send()
-                .await;
-
-            let mut updated = false;
-            if let Ok(res) = resp
-                && let Ok(body) = res.json::<SwitchBotStatusResponse>().await
-                && let Some(b) = body.body
-                && let (Some(temp), Some(hum)) = (b.temperature, b.humidity)
-            {
-                if temp_hist.is_empty() {
-                    for _ in 0..HIST_LEN {
+                let mut updated = false;
+                if let Ok(res) = resp
+                    && let Ok(body) = res.json::<SwitchBotStatusResponse>().await
+                    && let Some(b) = body.body
+                    && let (Some(temp), Some(hum)) = (b.temperature, b.humidity)
+                {
+                    if temp_hist.is_empty() {
+                        for _ in 0..HIST_LEN {
+                            temp_hist.push_back(temp);
+                            hum_hist.push_back(hum);
+                        }
+                        last_hist_record = Instant::now();
+                    } else if last_hist_record.elapsed() >= Duration::from_secs(HIST_INTERVAL_SECS)
+                    {
                         temp_hist.push_back(temp);
+                        if temp_hist.len() > HIST_LEN {
+                            temp_hist.pop_front();
+                        }
                         hum_hist.push_back(hum);
+                        if hum_hist.len() > HIST_LEN {
+                            hum_hist.pop_front();
+                        }
+                        last_hist_record = Instant::now();
                     }
-                    last_hist_record = Instant::now();
-                } else if last_hist_record.elapsed() >= Duration::from_secs(HIST_INTERVAL_SECS) {
-                    temp_hist.push_back(temp);
-                    if temp_hist.len() > HIST_LEN {
-                        temp_hist.pop_front();
-                    }
-                    hum_hist.push_back(hum);
-                    if hum_hist.len() > HIST_LEN {
-                        hum_hist.pop_front();
-                    }
-                    last_hist_record = Instant::now();
+
+                    let now_epoch = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+
+                    let mut st = status_for_sb.write().await;
+                    st.climate = Some(RoomClimate {
+                        online: true,
+                        temperature: temp,
+                        humidity: hum,
+                        battery: b.battery.unwrap_or(0),
+                        device_name: if config.device_name.is_empty() {
+                            "SwitchBot Meter".to_string()
+                        } else {
+                            config.device_name.clone()
+                        },
+                        updated_at: now_epoch,
+                        temp_history: temp_hist.iter().copied().collect(),
+                        humidity_history: hum_hist.iter().copied().collect(),
+                    });
+                    updated = true;
                 }
 
-                let now_epoch = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-
-                let mut st = status_for_sb.write().await;
-                st.climate = Some(RoomClimate {
-                    online: true,
-                    temperature: temp,
-                    humidity: hum,
-                    battery: b.battery.unwrap_or(0),
-                    device_name: if config.device_name.is_empty() {
-                        "SwitchBot Meter".to_string()
-                    } else {
-                        config.device_name.clone()
-                    },
-                    updated_at: now_epoch,
-                    temp_history: temp_hist.iter().copied().collect(),
-                    humidity_history: hum_hist.iter().copied().collect(),
-                });
-                updated = true;
-            }
-
-            if !updated {
-                let mut st = status_for_sb.write().await;
-                if let Some(ref mut cl) = st.climate {
-                    cl.online = false;
+                if !updated {
+                    let mut st = status_for_sb.write().await;
+                    if let Some(ref mut cl) = st.climate {
+                        cl.online = false;
+                    }
                 }
-            }
 
-            tokio::time::sleep(Duration::from_secs(30)).await;
-        }
-    });
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+    }
 
     // Background monitoring task (samples every 1s, computes 30s moving average)
     let status_clone = Arc::clone(&shared_status);
     let local_ip_clone = local_ip.clone();
+    let nas_url = nas_stats_url;
     tokio::spawn(async move {
         let mut sys = System::new_all();
         let mut disks = Disks::new_with_refreshed_list();
@@ -901,12 +939,12 @@ async fn main() {
 
             // Query NAS stats every 2 seconds to keep live metrics responsive
             second_counter += 1;
-            if second_counter.is_multiple_of(2) {
+            if second_counter.is_multiple_of(2)
+                && let Some(ref url) = nas_url
+                && !url.is_empty()
+            {
                 let client = http_client.clone();
-                let resp = client
-                    .get("http://192.168.0.12:8789/api/stats")
-                    .send()
-                    .await;
+                let resp = client.get(url).send().await;
                 if let Ok(res) = resp {
                     if let Ok(mut stats) = res.json::<NasStats>().await {
                         stats.online = true;
