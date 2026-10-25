@@ -244,21 +244,42 @@ mod win_eventlog {
 // Global logger combining file and Windows Event Log
 static LOG_LOCK: Mutex<()> = Mutex::new(());
 
-pub fn app_log(msg: &str) {
-    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let line = format!("[{}] {}\n", now, msg);
+const MAX_LOG_SIZE: u64 = 256 * 1024; // 256 KB
+const KEEP_LOG_SIZE: usize = 128 * 1024; // 128 KB
 
+fn write_to_log_file(line: &str) {
     if let Ok(_guard) = LOG_LOCK.lock() {
-        // Write to logs/server.log
         let _ = std::fs::create_dir_all("logs");
-        if let Ok(mut f) = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("logs/server.log")
+        let log_path = "logs/server.log";
+
+        if let Ok(metadata) = std::fs::metadata(log_path)
+            && metadata.len() > MAX_LOG_SIZE
+            && let Ok(content) = std::fs::read(log_path)
         {
+            let start_pos = if content.len() > KEEP_LOG_SIZE {
+                content.len() - KEEP_LOG_SIZE
+            } else {
+                0
+            };
+            let clean_start = content[start_pos..]
+                .iter()
+                .position(|&b| b == b'\n')
+                .map(|p| start_pos + p + 1)
+                .unwrap_or(start_pos);
+
+            let _ = std::fs::write(log_path, &content[clean_start..]);
+        }
+
+        if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(log_path) {
             let _ = f.write_all(line.as_bytes());
         }
     }
+}
+
+pub fn app_log(msg: &str) {
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let line = format!("[{}] {}\n", now, msg);
+    write_to_log_file(&line);
 
     #[cfg(windows)]
     win_eventlog::write_event(msg, false);
@@ -267,17 +288,7 @@ pub fn app_log(msg: &str) {
 pub fn app_error(msg: &str) {
     let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
     let line = format!("[{}] [ERROR] {}\n", now, msg);
-
-    if let Ok(_guard) = LOG_LOCK.lock() {
-        let _ = std::fs::create_dir_all("logs");
-        if let Ok(mut f) = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("logs/server.log")
-        {
-            let _ = f.write_all(line.as_bytes());
-        }
-    }
+    write_to_log_file(&line);
 
     #[cfg(windows)]
     win_eventlog::write_event(msg, true);
@@ -537,14 +548,16 @@ async fn serve_logs() -> impl IntoResponse {
     )
 }
 
+static LAST_TELEMETRY: Mutex<Option<String>> = Mutex::new(None);
+
 /// Serve status API endpoint
 async fn serve_status(
     axum::extract::State(state): axum::extract::State<Arc<RwLock<SystemStatus>>>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
     if let (Some(win_h), Some(scr_h)) = (params.get("winH"), params.get("scrH")) {
-        app_log(&format!(
-            "[Kindle Telemetry] win: {}x{}, docClient: {}x{}, scroll: {}x{}, sTop={}, sLeft={}, rot={}",
+        let tele_str = format!(
+            "win: {}x{}, docClient: {}x{}, scroll: {}x{}, sTop={}, sLeft={}, rot={}",
             params.get("winW").unwrap_or(&"-".to_string()),
             win_h,
             params.get("docW").unwrap_or(&"-".to_string()),
@@ -554,7 +567,18 @@ async fn serve_status(
             params.get("sTop").unwrap_or(&"0".to_string()),
             params.get("sLeft").unwrap_or(&"0".to_string()),
             params.get("rot").unwrap_or(&"-".to_string()),
-        ));
+        );
+
+        let mut should_log = false;
+        if let Ok(mut last) = LAST_TELEMETRY.lock()
+            && last.as_deref() != Some(&tele_str)
+        {
+            *last = Some(tele_str.clone());
+            should_log = true;
+        }
+        if should_log {
+            app_log(&format!("[Kindle Telemetry] {}", tele_str));
+        }
     }
     let status = state.read().await.clone();
     (
@@ -669,7 +693,58 @@ async fn main() {
     }));
 
     let app_config = AppConfig::load();
-    let nas_stats_url = app_config.nas.as_ref().map(|n| n.stats_url.clone());
+
+    // Background NAS polling task (samples every 5s, 20 points = 100s)
+    if let Some(nas_url) = app_config.nas.as_ref().map(|n| n.stats_url.clone())
+        && !nas_url.trim().is_empty()
+    {
+        let status_for_nas = Arc::clone(&shared_status);
+        tokio::spawn(async move {
+            app_log(&format!("NAS polling task started for {}", nas_url));
+
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(4))
+                .build()
+                .unwrap_or_default();
+
+            const HIST_LEN: usize = 20;
+            let mut cpu_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
+            let mut last_nas_stats: Option<NasStats> = None;
+
+            loop {
+                let resp = client.get(&nas_url).send().await;
+                let mut success = false;
+
+                if let Ok(res) = resp
+                    && let Ok(mut stats) = res.json::<NasStats>().await
+                {
+                    stats.online = true;
+                    cpu_hist.push_back(stats.cpu_pct);
+                    if cpu_hist.len() > HIST_LEN {
+                        cpu_hist.pop_front();
+                    }
+                    stats.cpu_history = cpu_hist.iter().copied().collect();
+                    last_nas_stats = Some(stats.clone());
+
+                    let mut st = status_for_nas.write().await;
+                    st.nas = Some(stats);
+                    success = true;
+                }
+
+                if !success {
+                    let mut st = status_for_nas.write().await;
+                    if let Some(ref mut st_nas) = st.nas {
+                        st_nas.online = false;
+                    } else if let Some(ref mut prev) = last_nas_stats {
+                        prev.online = false;
+                        st.nas = Some(prev.clone());
+                    }
+                }
+
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        });
+    }
 
     // Background SwitchBot polling task (samples every 30s)
     if let Some(config) = app_config.switchbot {
@@ -777,10 +852,9 @@ async fn main() {
         });
     }
 
-    // Background monitoring task (samples every 1s, computes 30s moving average)
+    // Background monitoring task (samples every 1s, computes 15s moving average)
     let status_clone = Arc::clone(&shared_status);
     let local_ip_clone = local_ip.clone();
-    let nas_url = nas_stats_url;
     tokio::spawn(async move {
         let mut sys = System::new_all();
         let mut disks = Disks::new_with_refreshed_list();
@@ -823,13 +897,6 @@ async fn main() {
         let mut gpu_hist: VecDeque<f32> = VecDeque::from(vec![0.0; HIST_LEN]);
         let mut net_in_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
         let mut net_out_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
-        let mut nas_cpu_hist: VecDeque<f64> = VecDeque::from(vec![0.0; HIST_LEN]);
-
-        let http_client = reqwest::Client::builder()
-            .timeout(Duration::from_millis(1500))
-            .build()
-            .unwrap_or_default();
-        let mut last_nas_stats: Option<NasStats> = None;
 
         let mut second_counter: u64 = 0;
 
@@ -937,30 +1004,9 @@ async fn main() {
             }
             let net_out_avg = net_out_smooth.iter().sum::<f64>() / net_out_smooth.len() as f64;
 
-            // Query NAS stats every 2 seconds to keep live metrics responsive
             second_counter += 1;
-            if second_counter.is_multiple_of(2)
-                && let Some(ref url) = nas_url
-                && !url.is_empty()
-            {
-                let client = http_client.clone();
-                let resp = client.get(url).send().await;
-                if let Ok(res) = resp {
-                    if let Ok(mut stats) = res.json::<NasStats>().await {
-                        stats.online = true;
-                        if let Some(ref prev) = last_nas_stats {
-                            stats.cpu_history = prev.cpu_history.clone();
-                        } else {
-                            stats.cpu_history = nas_cpu_hist.iter().copied().collect();
-                        }
-                        last_nas_stats = Some(stats);
-                    }
-                } else if let Some(ref mut st) = last_nas_stats {
-                    st.online = false;
-                }
-            }
 
-            // PC & NAS history sampling: 1 data point = 5 seconds, total 20 points = 100 seconds
+            // PC history sampling: 1 data point = 5 seconds, total 20 points = 100 seconds
             if second_counter.is_multiple_of(5) {
                 cpu_hist.push_back(cpu_avg);
                 if cpu_hist.len() > HIST_LEN {
@@ -985,15 +1031,6 @@ async fn main() {
                 net_out_hist.push_back(net_out_avg);
                 if net_out_hist.len() > HIST_LEN {
                     net_out_hist.pop_front();
-                }
-
-                let nas_cpu = last_nas_stats.as_ref().map(|s| s.cpu_pct).unwrap_or(0.0);
-                nas_cpu_hist.push_back(nas_cpu);
-                if nas_cpu_hist.len() > HIST_LEN {
-                    nas_cpu_hist.pop_front();
-                }
-                if let Some(ref mut st) = last_nas_stats {
-                    st.cpu_history = nas_cpu_hist.iter().copied().collect();
                 }
             }
 
@@ -1061,7 +1098,6 @@ async fn main() {
                 lock.net_out_history = net_out_hist.iter().copied().collect();
 
                 lock.disks = disk_list;
-                lock.nas = last_nas_stats.clone();
             }
 
             tokio::time::sleep(Duration::from_secs(1)).await;
