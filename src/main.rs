@@ -18,7 +18,7 @@ use std::{
     io::Write,
     net::{IpAddr, SocketAddr},
     sync::{Arc, Mutex},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use sysinfo::{Components, Disks, System};
 use tokio::sync::RwLock;
@@ -577,8 +577,10 @@ async fn main() {
             .unwrap_or_default();
 
         const HIST_LEN: usize = 20;
+        const HIST_INTERVAL_SECS: u64 = 180; // 3 minutes per point, 20 points = 60 minutes
         let mut temp_hist: VecDeque<f64> = VecDeque::with_capacity(HIST_LEN);
         let mut hum_hist: VecDeque<u32> = VecDeque::with_capacity(HIST_LEN);
+        let mut last_hist_record = Instant::now();
 
         loop {
             let t = chrono::Utc::now().timestamp_millis().to_string();
@@ -617,7 +619,8 @@ async fn main() {
                         temp_hist.push_back(temp);
                         hum_hist.push_back(hum);
                     }
-                } else {
+                    last_hist_record = Instant::now();
+                } else if last_hist_record.elapsed() >= Duration::from_secs(HIST_INTERVAL_SECS) {
                     temp_hist.push_back(temp);
                     if temp_hist.len() > HIST_LEN {
                         temp_hist.pop_front();
@@ -626,6 +629,7 @@ async fn main() {
                     if hum_hist.len() > HIST_LEN {
                         hum_hist.pop_front();
                     }
+                    last_hist_record = Instant::now();
                 }
 
                 let now_epoch = SystemTime::now()
@@ -821,9 +825,31 @@ async fn main() {
             }
             let net_out_avg = net_out_smooth.iter().sum::<f64>() / net_out_smooth.len() as f64;
 
-            // History & NAS sampling every 2 seconds
+            // Query NAS stats every 2 seconds to keep live metrics responsive
             second_counter += 1;
             if second_counter.is_multiple_of(2) {
+                let client = http_client.clone();
+                let resp = client
+                    .get("http://192.168.0.12:8789/api/stats")
+                    .send()
+                    .await;
+                if let Ok(res) = resp {
+                    if let Ok(mut stats) = res.json::<NasStats>().await {
+                        stats.online = true;
+                        if let Some(ref prev) = last_nas_stats {
+                            stats.cpu_history = prev.cpu_history.clone();
+                        } else {
+                            stats.cpu_history = nas_cpu_hist.iter().copied().collect();
+                        }
+                        last_nas_stats = Some(stats);
+                    }
+                } else if let Some(ref mut st) = last_nas_stats {
+                    st.online = false;
+                }
+            }
+
+            // PC & NAS history sampling: 1 data point = 5 seconds, total 20 points = 100 seconds
+            if second_counter.is_multiple_of(5) {
                 cpu_hist.push_back(cpu_avg);
                 if cpu_hist.len() > HIST_LEN {
                     cpu_hist.pop_front();
@@ -849,24 +875,13 @@ async fn main() {
                     net_out_hist.pop_front();
                 }
 
-                // Query NAS stats
-                let client = http_client.clone();
-                let resp = client
-                    .get("http://192.168.0.12:8789/api/stats")
-                    .send()
-                    .await;
-                if let Ok(res) = resp {
-                    if let Ok(mut stats) = res.json::<NasStats>().await {
-                        stats.online = true;
-                        nas_cpu_hist.push_back(stats.cpu_pct);
-                        if nas_cpu_hist.len() > HIST_LEN {
-                            nas_cpu_hist.pop_front();
-                        }
-                        stats.cpu_history = nas_cpu_hist.iter().copied().collect();
-                        last_nas_stats = Some(stats);
-                    }
-                } else if let Some(ref mut st) = last_nas_stats {
-                    st.online = false;
+                let nas_cpu = last_nas_stats.as_ref().map(|s| s.cpu_pct).unwrap_or(0.0);
+                nas_cpu_hist.push_back(nas_cpu);
+                if nas_cpu_hist.len() > HIST_LEN {
+                    nas_cpu_hist.pop_front();
+                }
+                if let Some(ref mut st) = last_nas_stats {
+                    st.cpu_history = nas_cpu_hist.iter().copied().collect();
                 }
             }
 
