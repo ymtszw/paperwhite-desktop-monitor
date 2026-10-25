@@ -31,8 +31,9 @@ A high-contrast, zero-overflow E-ink dashboard server written in Rust for Window
    - **No Unsupported Unicode / Emojis**: Kindle PW3 built-in fonts lack emojis and exotic symbols (they render as `▯`). Only use standard ASCII and proven symbols (`↓`, `↑`, `⟳`, `☾`, `%`, `°C`).
    - **No CSS Viewport Bug Traps**: Legacy WebKit miscalculates relative percentage heights inside `display: table-cell`. All inner chart bars and sparklines must use explicit integer pixel bounding (`maxBarPx = 50`).
 4. **Sub-System Visual Differentiation**:
-   - **PC Tiles (Rows 1 & 2: CPU, GPU, RAM, NETWORK, STORAGE, SYS FANS)**: Clean white cards with crisp 3px solid black border, black text, and thin solid divider lines.
-   - **NAS Tiles (Row 3, Cells 6 & 7: NAS SYS, NAS VOL / NW)**: Branded with a solid **inverted black header banner** (`background: #000; color: #fff;`) spanning edge-to-edge, and dashed divider lines (`border-top: 2px dashed #000;`), creating instant visual distinction on monochrome E-ink displays.
+   - **PC Tiles (Rows 1 & 2: CPU, GPU, RAM, NETWORK, STORAGE)**: Clean white cards with crisp 3px solid black border, black text, and thin solid divider lines (`solid #000`).
+   - **Room Climate Tile (Row 2, Cell 5: ROOM CLIMATE)**: Inverted black pill badge header (`[ ROOM CLIMATE ]`), source tag (`SWITCHBOT`), and **dotted divider lines** (`dotted #000`), displaying ambient room temperature, humidity, battery, and dynamic sparkline history.
+   - **NAS Tiles (Row 3, Cells 6 & 7: NAS SYS, NAS VOL / NW)**: Branded with a solid **inverted black header banner** (`background: #000; color: #fff;`) spanning edge-to-edge, and **dashed divider lines** (`border-top: 2px dashed #000;`), creating instant visual distinction on monochrome E-ink displays.
    - **System Controller Tile (Row 3, Cell 8: SYSTEM)**: Screen rotator and motherboard system temperature card.
 
 ---
