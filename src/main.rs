@@ -523,8 +523,82 @@ async fn serve_status(
     )
 }
 
+/// Ensure working directory is always set to workspace root regardless of how the executable was invoked
+fn ensure_workspace_dir() {
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        if (exe_dir.ends_with("release") || exe_dir.ends_with("debug"))
+            && let Some(target_dir) = exe_dir.parent()
+            && let Some(root_dir) = target_dir.parent()
+        {
+            let _ = std::env::set_current_dir(root_dir);
+            return;
+        }
+        let _ = std::env::set_current_dir(exe_dir);
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    ensure_workspace_dir();
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "--register-startup" => {
+                let exe = std::env::current_exe()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let cmd = format!(
+                    "Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'KindleDesktopMonitor' -Value '{}'",
+                    exe
+                );
+                let status = std::process::Command::new("powershell")
+                    .args(["-NoProfile", "-Command", &cmd])
+                    .status();
+                if status.map(|s| s.success()).unwrap_or(false) {
+                    println!(
+                        "[OK] Successfully registered KindleDesktopMonitor to Windows Startup (Registry)."
+                    );
+                } else {
+                    eprintln!("[ERROR] Failed to register to Windows Startup.");
+                }
+                return;
+            }
+            "--unregister-startup" => {
+                let cmd = "Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'KindleDesktopMonitor' -ErrorAction SilentlyContinue";
+                let status = std::process::Command::new("powershell")
+                    .args(["-NoProfile", "-Command", cmd])
+                    .status();
+                if status.map(|s| s.success()).unwrap_or(false) {
+                    println!(
+                        "[OK] Successfully unregistered KindleDesktopMonitor from Windows Startup."
+                    );
+                } else {
+                    eprintln!("[ERROR] Failed to unregister from Windows Startup.");
+                }
+                return;
+            }
+            "--status-startup" => {
+                let cmd = "(Get-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'KindleDesktopMonitor' -ErrorAction SilentlyContinue).KindleDesktopMonitor";
+                let output = std::process::Command::new("powershell")
+                    .args(["-NoProfile", "-Command", cmd])
+                    .output();
+                let val = output
+                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    .unwrap_or_default();
+                if !val.is_empty() {
+                    println!("KindleDesktopMonitor startup: ENABLED -> {}", val);
+                } else {
+                    println!("KindleDesktopMonitor startup: DISABLED");
+                }
+                return;
+            }
+            _ => {}
+        }
+    }
+
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
