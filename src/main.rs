@@ -352,6 +352,8 @@ pub struct AppConfig {
     pub nas: Option<NasConfig>,
     #[serde(default)]
     pub switchbot: Option<SwitchBotConfigFile>,
+    #[serde(rename = "ignoredDisks", default)]
+    pub ignored_disks: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -397,6 +399,25 @@ impl AppConfig {
 
         cfg
     }
+}
+
+pub fn is_disk_ignored(vol_name: &str, mount_point: &str, ignored_disks: &[String]) -> bool {
+    // Automatically hide Google Drive virtual disks
+    if vol_name.to_ascii_lowercase().contains("google drive") {
+        return true;
+    }
+    // Check against user-configured ignored patterns (case-insensitive)
+    ignored_disks.iter().any(|pattern| {
+        let pat = pattern.trim().to_ascii_lowercase();
+        if pat.is_empty() {
+            return false;
+        }
+        vol_name.to_ascii_lowercase().contains(&pat)
+            || mount_point.to_ascii_lowercase().starts_with(&pat)
+            || mount_point
+                .trim_end_matches(['\\', '/'])
+                .eq_ignore_ascii_case(pat.trim_end_matches(['\\', '/']))
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -855,6 +876,7 @@ async fn main() {
     // Background monitoring task (samples every 1s, computes 15s moving average)
     let status_clone = Arc::clone(&shared_status);
     let local_ip_clone = local_ip.clone();
+    let ignored_disks = app_config.ignored_disks.clone();
     tokio::spawn(async move {
         let mut sys = System::new_all();
         let mut disks = Disks::new_with_refreshed_list();
@@ -1050,7 +1072,12 @@ async fn main() {
                 let free_gb = free as f64 / 1_073_741_824.0;
                 let used_gb = used as f64 / 1_073_741_824.0;
                 let usage_pct = (used as f64 / total as f64) * 100.0;
-                let name = disk.mount_point().to_string_lossy().to_string();
+                let vol_name = disk.name().to_string_lossy();
+                let mount_point = disk.mount_point().to_string_lossy();
+                if is_disk_ignored(&vol_name, &mount_point, &ignored_disks) {
+                    continue;
+                }
+                let name = mount_point.to_string();
 
                 disk_list.push(DiskInfo {
                     name,
@@ -1141,6 +1168,23 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_disk_ignored() {
+        assert!(is_disk_ignored("Google Drive", "R:\\", &[]));
+        assert!(is_disk_ignored("google drive", "Z:\\", &[]));
+        assert!(!is_disk_ignored("", "G:\\", &[]));
+        assert!(is_disk_ignored("My Google Drive Backup", "X:\\", &[]));
+        assert!(!is_disk_ignored("", "C:\\", &[]));
+        assert!(!is_disk_ignored("Local Disk", "D:\\", &[]));
+        assert!(is_disk_ignored("", "D:\\", &["D:".to_string()]));
+        assert!(is_disk_ignored(
+            "Backup Drive",
+            "E:\\",
+            &["backup".to_string()]
+        ));
+    }
     #[test]
     fn test_nvml_rpm() {
         if let Ok(nvml) = nvml_wrapper::Nvml::init()

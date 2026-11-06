@@ -7,5 +7,6 @@
     "secret": "YOUR_SWITCHBOT_SECRET",
     "deviceId": "YOUR_DEVICE_ID",
     "deviceName": "リビング温湿度計"
-  }
+  },
+  "ignoredDisks": []
 }
